@@ -33,6 +33,10 @@ The production Vercel project must have `NEXT_PUBLIC_JOBPILOT_SITE_URL=https://j
 
 If links keep reporting `otp_expired` immediately even with correct redirects, an email security scanner or preview may have visited the one-time link. Consider email **OTP code** authentication instead (requires a different Supabase email template), and check Supabase Auth logs before changing providers.
 
+### Email sending limits (public launch requirement)
+
+When Supabase Auth reports `email rate limit exceeded`, its built-in SMTP sending quota has been exhausted **for the entire project**. JobPilot now shows a clear explanation and temporarily disables duplicate sign-in requests in the browser. This **does not raise or reset the Supabase quota**. Follow [Supabase custom SMTP instructions](https://supabase.com/docs/guides/auth/auth-smtp) to connect a dedicated transactional email provider (such as Resend, AWS SES, Brevo, or Postmark) under **Authentication → SMTP Settings**. Configure a verified sender/domain and check [Auth Rate Limits](https://supabase.com/docs/guides/auth/rate-limits), email delivery and abuse protections before inviting public users. Supabase's default email service is restricted to authorized organization emails and is intended for testing, not a public launch. Do not disable email confirmation to work around a sending limit.
+
 ### Optional account sign-in and saved jobs
 Create a Supabase project, run `supabase/schema.sql` in its SQL editor, enable Email OTP/magic link, and add your deployment hostname to Auth allowed redirect URLs. Configure the environment variables from `.env.example` in Vercel and redeploy. Users will then be able to sign in and save jobs privately with row-level security policies.
 

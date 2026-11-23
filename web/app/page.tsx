@@ -37,6 +37,9 @@ export default function Page(){
  const [authOpen,setAuthOpen]=useState(false);
  const [email,setEmail]=useState("");
  const [authMessage,setAuthMessage]=useState("");
+ const [authIsError,setAuthIsError]=useState(false);
+ const [authSending,setAuthSending]=useState(false);
+ const [authCooldownSeconds,setAuthCooldownSeconds]=useState(0);
  const [provider,setProvider]=useState("OpenAI");
  const [apiKey,setApiKey]=useState("");
  const [models,setModels]=useState<Model[]>([]);
@@ -54,6 +57,7 @@ export default function Page(){
    const errorCode=fragment.get("error_code") || fragment.get("error");
    if(errorCode){
      setAuthOpen(true);
+     setAuthIsError(true);
      setAuthMessage(errorCode==="otp_expired"
        ? "This sign-in link has expired or has already been used. Enter your email to request a new one."
        : "Sign-in did not complete. Please request a fresh email link.");
@@ -85,6 +89,13 @@ export default function Page(){
    finally{setLoading(false);}
  }
  useEffect(()=>{void scan();},[]);
+ // A client-side cooldown reduces accidental duplicate email requests.
+ // It cannot override or reset Supabase's project-wide SMTP quota.
+ useEffect(()=>{
+   if(authCooldownSeconds<=0)return;
+   const timer=window.setTimeout(()=>setAuthCooldownSeconds(seconds=>Math.max(0,seconds-1)),1000);
+   return ()=>window.clearTimeout(timer);
+ },[authCooldownSeconds]);
  const providers=["OpenAI","Claude","Gemini"];
  useEffect(()=>{setModels([]);setModel("");setApiKey("");setDraft("");},[provider]);
  const selected=jobs.find(j=>j.id===active)||jobs[0];
@@ -137,13 +148,40 @@ export default function Page(){
   setSaved(prev=>prev.filter(x=>x.job_id!==id));
  }
  async function signIn(){
+  if(authSending || authCooldownSeconds>0)return;
   setAuthMessage("");
-  const sb=getSupabase();if(!sb){setAuthMessage("Accounts aren't enabled yet. The owner needs to connect Supabase first.");return;}
-  // Production uses its explicit public URL. Local development falls back to its own origin.
-  // Supabase Auth must separately allow this destination under URL Configuration.
-  const redirectTo=(process.env.NEXT_PUBLIC_JOBPILOT_SITE_URL || window.location.origin).replace(/\/$/, "");
-  const {error}=await sb.auth.signInWithOtp({email:email.trim(),options:{emailRedirectTo:redirectTo}});
-  setAuthMessage(error ? error.message : "Magic sign-in link sent. Check your inbox.");
+  setAuthIsError(false);
+  const sb=getSupabase();
+  if(!sb){setAuthIsError(true);setAuthMessage("Accounts aren't enabled yet. The owner needs to connect Supabase first.");return;}
+  const address=email.trim();
+  if(!address.includes("@"))return;
+  setAuthSending(true);
+  try{
+    // Explicit production redirect; the same URL must be allowed in Supabase Auth.
+    const redirectTo=(process.env.NEXT_PUBLIC_JOBPILOT_SITE_URL || window.location.origin).replace(/\/$/, "");
+    const {error}=await sb.auth.signInWithOtp({email:address,options:{emailRedirectTo:redirectTo}});
+    if(error){
+      setAuthIsError(true);
+      const code=error.code||"";
+      if(code==="over_email_send_rate_limit" || /email rate limit exceeded/i.test(error.message)){
+        setAuthCooldownSeconds(10*60);
+        setAuthMessage("The site's email sending quota has been reached. No new magic link was sent. Try again after Supabase's limit resets. The site owner needs to configure custom SMTP for reliable sign-in.");
+      } else if(error.status===429 || /rate limit/i.test(error.message)){
+        setAuthCooldownSeconds(60);
+        setAuthMessage("Too many sign-in requests. Please retry after the provider's rate limit resets.");
+      } else if(code==="email_address_not_authorized"){
+        setAuthMessage("The site's built-in email sender only supports authorized team addresses. The site owner needs to configure custom SMTP.");
+      } else {
+        setAuthMessage(error.message);
+      }
+    } else {
+      setAuthCooldownSeconds(60);
+      setAuthMessage("Sign-in email requested successfully. Check your inbox and open only the newest link.");
+    }
+  }catch{
+    setAuthIsError(true);
+    setAuthMessage("Couldn't request a sign-in link. Check your connection and try again.");
+  }finally{setAuthSending(false);}
  }
  function openJob(id:string){setActive(id);setTab("discover");setDraft("");}
  function applyLink(url:string){window.open(url,"_blank","noopener,noreferrer");}
@@ -263,8 +301,8 @@ export default function Page(){
     <div className="modal" role="dialog" aria-modal="true" aria-label="Sign in"><button className="modal-close" onClick={()=>setAuthOpen(false)}><X size={18}/></button>
     <div className="brandmark modal-logo"><Plane size={23}/></div><h2>Welcome to JobPilot</h2><p>Sign in to save opportunities privately and manage your job search.</p>
     <label className="field"><span>Email address</span><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="you@example.com"/></label>
-    <button className="primary-button full" onClick={()=>void signIn()} disabled={!email.includes("@")}><Mail size={17}/> Send sign-in link</button>
-    {authMessage&&<p className="auth-message">{authMessage}</p>}
+    <button className="primary-button full" onClick={()=>void signIn()} disabled={!email.includes("@")||authSending||authCooldownSeconds>0}><Mail size={17}/> {authSending?"Sending...":authCooldownSeconds>0?"Retry in "+Math.ceil(authCooldownSeconds/60)+"m":"Send sign-in link"}</button>
+    {authMessage&&<p role="status" aria-live="polite" className={authIsError?"auth-message auth-error":"auth-message"}>{authMessage}</p>}
     {!supabaseReady&&<p className="auth-message">Accounts are not enabled on this preview. Public job browsing works without signing in.</p>}
     </div>
    </div>}
