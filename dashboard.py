@@ -62,7 +62,9 @@ with st.sidebar:
                 st.error(f"Scan failed: {exc}")
     st.divider()
     st.write("**Personal profile:**", config["profile"]["current_focus"])
-    st.caption("Edit config.yaml for roles, skills and acceptable locations.")
+    st.caption("Edit config.yaml for roles, skills, sources, and career-page URLs.")
+    enabled_sources = [name for name, enabled in config.get("remote_sources", {}).items() if enabled]
+    st.caption("Remote feeds: " + (", ".join(enabled_sources) if enabled_sources else "none"))
     st.caption("No application is submitted by this dashboard.")
 
 jobs = stored_jobs(conn)
@@ -94,6 +96,7 @@ with browse:
             "Posted / updated": j["posted_at"][:10] or "Unknown",
             "Date type": j["date_kind"].replace("_", " "),
             "Fit /100": j["score"], "Role": j["title"], "Company": j["company"],
+            "Source": j["platform"],
             "Location": j["location"], "Eligibility": j["location_status"],
             "Status": j["status"], "Last seen": j["last_seen"][:10], "Job link": j["url"]
         })
@@ -173,6 +176,9 @@ with desk:
 
 with settings:
     st.markdown("""### Data sources & limitations
+- **Company careers:** SmartRecruiters and Workable public endpoints, plus explicit pages with JobPosting structured data.
+- **Remote feeds:** Himalayas and Remotive (enabled by default); Remote OK is optional.
+- **Source attribution:** Keep the source name and original listing link visible; verify India eligibility before applying.
 - **Ashby:** Published job feed; date is *last published*.
 - **Greenhouse:** Public job board; first-published date used if available, otherwise the update date is flagged.
 - **Lever:** Published job feed; created timestamp is not necessarily the exact go-live date.
