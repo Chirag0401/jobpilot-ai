@@ -56,6 +56,8 @@ search:
     - 'site:job-boards.greenhouse.io ("DevOps" OR "Platform Engineer") "India"'
     - 'site:jobs.lever.co ("DevOps Engineer" OR "SRE") ("Mumbai" OR "Remote")'
     - '("OpenShift" OR "OCP") ("DevOps" OR "Platform Engineer") "India" jobs'
+    - 'site:careers.smartrecruiters.com ("DevOps" OR "SRE") "India"'
+    - 'site:apply.workable.com ("Platform Engineer" OR "DevOps") "India"'
   results_per_query: 10
   max_discovered_boards: 30
 # These are known public careers pages; configure your own and remove any you don't want.
@@ -64,3 +66,19 @@ boards:
   ashby: ["Linkup", "openobserve-careers", "sarvam", "uptimeai", "playpowerlabs"]
   greenhouse: ["sonicwall"]
   lever: ["mactores", "brightedge", "lingarogroup"]
+
+# Public remote-job feeds; no API keys required.
+# Himalayas refreshes daily. Remotive publishes with ~24-hour delay.
+# Remote OK is opt-in due to additional source-attribution rules.
+remote_sources:
+  himalayas: true
+  remotive: true
+  remoteok: false
+
+# Paste the company career URLs you want to check.
+# Supported ATS pages: Ashby, Greenhouse, Lever, SmartRecruiters, Workable.
+# Other HTTPS sites must include JobPosting JSON-LD on the specific page.
+company_career_urls: []
+#  - "https://careers.smartrecruiters.com/SmartRecruiters"
+#  - "https://apply.workable.com/YOUR-COMPANY"
+#  - "https://jobs.ashbyhq.com/YOUR-COMPANY"

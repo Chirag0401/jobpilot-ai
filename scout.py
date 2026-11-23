@@ -93,92 +93,28 @@ def safe_get(url: str, **kwargs) -> dict:
     return response.json()
 
 
+# Public wrappers preserve original imports and test monkeypatching.
 def fetch_ashby(board: str) -> list[Job]:
-    data = safe_get(f"https://api.ashbyhq.com/posting-api/job-board/{board}")
-    out = []
-    for j in data.get("jobs", []):
-        if j.get("isListed") is False:
-            continue
-        title, link = j.get("title", ""), j.get("jobUrl", "")
-        if not title or not canonical_url(link):
-            continue
-        parts = urlparse(link).path.strip("/").split("/")
-        posting_id = parts[1] if len(parts) > 1 else link
-        date = parse_date(j.get("publishedAt"))
-        secondary = [a.get("location", "") for a in j.get("secondaryLocations", []) if isinstance(a, dict)]
-        loc = ", ".join([j.get("location", "")] + secondary).strip(", ")
-        workplace = j.get("workplaceType", "")
-        if not workplace and j.get("isRemote"):
-            workplace = "Remote or hybrid (verify)"
-        out.append(Job(uid("ashby", board, posting_id, link), board, title, loc,
-                       "Ashby", canonical_url(link), j.get("applyUrl", link),
-                       j.get("descriptionPlain") or clean_html(j.get("descriptionHtml", "")),
-                       date, "last_published" if date else "unknown", workplace))
-    return out
+    from sources.ats import fetch_ashby as fetch
+    return fetch(board)
 
 
 def fetch_greenhouse(board: str) -> list[Job]:
-    data = safe_get(f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs", params={"content": "true"})
-    out = []
-    for j in data.get("jobs", []):
-        title, link = j.get("title", ""), j.get("absolute_url", "")
-        if not title or not canonical_url(link):
-            continue
-        date, kind = parse_date(j.get("first_published")), "first_published"
-        if not date:
-            date, kind = parse_date(j.get("updated_at")), "updated_only"
-        loc = (j.get("location") or {}).get("name", "")
-        out.append(Job(uid("greenhouse", board, str(j.get("id", "")), link), board, title,
-                       loc, "Greenhouse", canonical_url(link), link,
-                       clean_html(j.get("content", "")), date, kind if date else "unknown"))
-    # Greenhouse individual job endpoint can provide first_published when its board list omits it.
-    # Fetch ONLY plausible roles to limit API requests.
-    for j in [x for x in out if role_match(x.title)][:35]:
-        if j.date_kind == "first_published":
-            continue
-        match = re.search(r"/jobs/(\d+)", urlparse(j.url).path)
-        if not match:
-            continue
-        try:
-            detail = safe_get(f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{match.group(1)}")
-            first = parse_date(detail.get("first_published"))
-            if first:
-                j.posted_at, j.date_kind = first, "first_published"
-            if not j.description:
-                j.description = clean_html(detail.get("content", ""))
-            time.sleep(0.05)
-        except (requests.RequestException, ValueError):
-            pass
-    return out
+    from sources.ats import fetch_greenhouse as fetch
+    return fetch(board)
 
 
 def fetch_lever(board: str) -> list[Job]:
-    data = safe_get(f"https://api.lever.co/v0/postings/{board}", params={"mode": "json"})
-    out = []
-    for j in data:
-        title, link = j.get("text", ""), j.get("hostedUrl", "")
-        if not title or not canonical_url(link):
-            continue
-        cats = j.get("categories", {}) or {}
-        description = clean_html(j.get("description", ""))
-        for section in j.get("lists", []) or []:
-            description += " " + clean_html(section.get("content", ""))
-        description += " " + clean_html(j.get("additional", ""))
-        date = parse_date(j.get("createdAt"))
-        out.append(Job(uid("lever", board, j.get("id", ""), link), board, title,
-                       cats.get("location", ""), "Lever", canonical_url(link),
-                       j.get("applyUrl", link), description,
-                       date, "created" if date else "unknown", j.get("workplaceType", "")))
-    return out
+    from sources.ats import fetch_lever as fetch
+    return fetch(board)
 
 
-def role_match(title: str) -> bool:
+def role_match(title: str, terms: list[str] | None = None) -> bool:
     t = title.lower()
-    return any(x in t for x in (
-        "devops", "dev ops", "site reliability", "sre", "platform engineer",
-        "cloud engineer", "infrastructure engineer", "cloud native engineer",
-        "openshift", "kubernetes engineer"
-    ))
+    configured = terms or ("devops", "dev ops", "site reliability", "sre",
+                           "platform engineer", "cloud engineer", "infrastructure engineer",
+                           "cloud native engineer", "openshift", "kubernetes engineer")
+    return any(term.lower() in t for term in configured)
 
 
 def ats_board_from_url(url: str) -> tuple[str, str] | None:
@@ -193,6 +129,10 @@ def ats_board_from_url(url: str) -> tuple[str, str] | None:
         return ("greenhouse", parts[0])
     if host in {"jobs.lever.co", "jobs.eu.lever.co"}:
         return ("lever", parts[0])
+    if host in {"careers.smartrecruiters.com", "jobs.smartrecruiters.com"}:
+        return ("smartrecruiters", parts[0])
+    if host in {"apply.workable.com", "jobs.workable.com"}:
+        return ("workable", parts[0])
     return None
 
 
@@ -219,7 +159,7 @@ def discover_serper(config: dict, freshness: str) -> tuple[set[tuple[str, str]],
                     boards.add(board)
                     continue
                 # General OpenShift/OCP query: retain relevant non-ATS links, date UNKNOWN.
-                if q == config["search"]["queries"][-1] and canonical_url(url):
+                if "site:" not in q.lower() and canonical_url(url):
                     title = item.get("title", "")
                     snippet = item.get("snippet", "")
                     if role_match(title) and not any(x in (urlparse(url).hostname or "").lower() for x in ("linkedin.com", "indeed.com", "naukri.com")):
@@ -258,13 +198,15 @@ def location_check(job: Job, prefs: dict) -> tuple[str, int]:
 
 
 def score_job(job: Job, prefs: dict) -> Job | None:
-    if not role_match(job.title):
+    if not role_match(job.title, prefs.get("role_terms")):
         return None
     title_lower = job.title.lower()
     if any(w in title_lower for w in prefs.get("exclude_seniority_terms", [])):
         return None
     loc_status, loc_score = location_check(job, prefs)
     if loc_status == "excluded":
+        return None
+    if loc_status == "Remote India" and not prefs.get("allow_remote_india", True):
         return None
     if loc_status in {"Remote eligibility unverified", "Location unverified"} and not prefs.get("include_unverified_remote", False):
         return None
@@ -295,8 +237,33 @@ def scan(config: dict, freshness_override: Optional[str] = None) -> tuple[list[J
     max_boards = int(config["search"].get("max_discovered_boards", 30))
     if len(boards) > max_boards:
         warnings.append(f"Limited to {max_boards} boards this run (configured + discovered).")
-    fetchers = {"ashby": fetch_ashby, "greenhouse": fetch_greenhouse, "lever": fetch_lever}
+    from sources.careers import fetch_smartrecruiters, fetch_workable, fetch_structured_page, resolve_board
+    from sources.remote import fetch_himalayas, fetch_remotive, fetch_remoteok
+    fetchers = {"ashby": fetch_ashby, "greenhouse": fetch_greenhouse, "lever": fetch_lever,
+                "smartrecruiters": fetch_smartrecruiters, "workable": fetch_workable}
+    for career_url in config.get("company_career_urls", []):
+        match = resolve_board(career_url)
+        if match:
+            boards.add(match)
     all_jobs = list(external)
+    for career_url in config.get("company_career_urls", []):
+        if resolve_board(career_url):
+            continue
+        try:
+            parsed = fetch_structured_page(career_url)
+            all_jobs.extend(parsed)
+            if not parsed:
+                warnings.append(f"No JobPosting structured data found at {career_url}. Add a direct posting URL or a supported ATS page.")
+        except (requests.RequestException, ValueError) as exc:
+            warnings.append(f"Could not read career page {career_url}: {exc}")
+    remote_sources = config.get("remote_sources", {})
+    remote_fetchers = {"himalayas": fetch_himalayas, "remotive": fetch_remotive, "remoteok": fetch_remoteok}
+    for source, fetch in remote_fetchers.items():
+        if remote_sources.get(source, False):
+            try:
+                all_jobs.extend(fetch())
+            except (requests.RequestException, ValueError, TypeError, KeyError) as exc:
+                warnings.append(f"Could not fetch {source}: {exc}")
     for provider, board in sorted(boards)[:max_boards]:
         try:
             all_jobs.extend(fetchers[provider](board))
@@ -304,6 +271,7 @@ def scan(config: dict, freshness_override: Optional[str] = None) -> tuple[list[J
             warnings.append(f"Could not fetch {provider}/{board}: {exc}")
     prefs = config["preferences"]
     seen = {}
+    seen_urls = {}
     now = datetime.now(timezone.utc)
     max_days = int(prefs.get("max_age_days", 30))
     for job in all_jobs:
@@ -314,8 +282,18 @@ def scan(config: dict, freshness_override: Optional[str] = None) -> tuple[list[J
             posted = datetime.fromisoformat(job.posted_at)
             if posted < now - timedelta(days=max_days):
                 continue
+        canonical = canonical_url(job.url)
+        if canonical in seen_urls:
+            previous_uid = seen_urls[canonical]
+            previous = seen[previous_uid]
+            if DATE_PRIORITY[job.date_kind] > DATE_PRIORITY[previous.date_kind]:
+                del seen[previous_uid]
+                seen[job.uid] = job
+                seen_urls[canonical] = job.uid
+            continue
         if job.uid not in seen or DATE_PRIORITY[job.date_kind] > DATE_PRIORITY[seen[job.uid].date_kind]:
             seen[job.uid] = job
+            seen_urls[canonical] = job.uid
     return newest_first(list(seen.values())), warnings
 
 

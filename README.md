@@ -28,7 +28,9 @@ flowchart LR
 
 | Feature | Standard | Multi-AI |
 |---|:---:|:---:|
-| Search public Ashby, Greenhouse & Lever boards | ✅ | ✅ |
+| Search Ashby, Greenhouse, Lever, SmartRecruiters & Workable boards | ✅ | ✅ |
+| Public remote feeds (Himalayas, Remotive; Remote OK opt-in) | ✅ | ✅ |
+| Company career-page watchlist | ✅ | ✅ |
 | Optional Google X-Ray discovery via Serper | ✅ | ✅ |
 | Newest-first with clearly labeled dates | ✅ | ✅ |
 | Rank jobs by skills, title and location | ✅ | ✅ |
@@ -118,6 +120,34 @@ SERPER_API_KEY=
 
 **Costs:** Provider API usage/billing is separate from ChatGPT Plus, Claude Pro and Gemini app subscriptions. Serper has its own quota/pricing. Check the provider dashboard before enabling paid usage. Models can change; choose a model ID currently available to your account.
 
+## 🌍 Additional job sources and company career pages
+
+JobPilot now supports **Ashby, Greenhouse, Lever, SmartRecruiters, Workable**, plus public **Himalayas** and **Remotive** remote feeds. **Remote OK** is available as an opt-in source. Every job displays its source and links to the original listing.
+
+**No API key is required** for these public feeds. Serper remains optional for discovering additional employer job boards with Google X-Ray searches.
+
+Edit `config.yaml` to control the new sources:
+
+```yaml
+remote_sources:
+  himalayas: true
+  remotive: true
+  remoteok: false
+
+company_career_urls:
+  - "https://careers.smartrecruiters.com/SmartRecruiters"
+  - "https://apply.workable.com/YOUR-COMPANY"
+  - "https://jobs.ashbyhq.com/YOUR-COMPANY"
+```
+
+For **other career-page URLs**, JobPilot reads publicly available [JobPosting JSON-LD](https://developers.google.com/search/docs/appearance/structured-data/job-posting) on that **exact page only**. It does not bypass logins, guess private job-board URLs, or crawl an entire site. If a page lacks structured jobs, the dashboard shows a warning.
+
+**Eligibility and dates:** Himalayas country restrictions are checked before treating a remote job as India-eligible. Remotive listings may be delayed by about 24 hours, so they are not instant alerts. Public remote feeds are cached locally to reduce request volume. A generic "remote" label is **not** treated as permission to work from India.
+
+**Attribution and terms:** Preserve the source label and original job link for [Himalayas](https://himalayas.app/docs/remote-jobs-api), [Remotive](https://remotive.com/remote-jobs/api), and (if enabled) [Remote OK](https://remoteok.com/faq). Do not republish Remotive jobs to third-party aggregators. Check provider terms before publishing a hosted job board. The standalone app remains local-first.
+
+**Not included yet:** LinkedIn, Indeed, Instahyre, Cutshort, Wellfound, Naukri and foundit integrations. Those are later phases using permitted discovery methods, not unauthorized scraping.
+
 ## 🔎 Search for jobs
 
 1. Open the dashboard.
@@ -128,7 +158,7 @@ SERPER_API_KEY=
 
 **Without a Serper key:** searches the public company boards listed in `config.yaml`.
 
-**With a Serper key:** uses these four Google X-Ray discovery patterns automatically:
+**With a Serper key:** uses configured Google X-Ray searches, including these examples:
 
 ```text
 site:jobs.ashbyhq.com ("DevOps Engineer" OR "SRE" OR "Platform Engineer") ("India" OR "Remote")
@@ -161,6 +191,7 @@ New to the project? Follow the [beginner-friendly codebase walkthrough](docs/COD
 jobpilot-ai/
 ├── dashboard.py                 # Easy-to-use web dashboard
 ├── scout.py                     # Discover, score and track jobs
+├── sources/                     # ATS, remote feeds and career-page adapters
 ├── ai_providers.py              # OpenAI / Claude / Gemini API calls
 ├── autofill.py                  # OPTIONAL browser helper (no submission)
 ├── config.yaml                  # Customizable search and skill preferences
