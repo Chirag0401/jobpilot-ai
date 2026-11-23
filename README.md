@@ -57,8 +57,6 @@ git clone https://github.com/Chirag0401/jobpilot-ai.git
 cd jobpilot-ai
 ```
 
-> **Publishing note:** The clone URL above is the intended repository address. It will work **only after** the owner creates/pushes the GitHub repository; until then, use the downloadable source ZIP.
-
 ## ▶️ Run in two steps
 
 Install **Python 3.10+** first. Then choose **one** edition:
@@ -78,16 +76,11 @@ The launch script creates a virtual environment, installs required Python packag
 
 **Already using the previous version?** Back up your `.env`, `config.yaml`, and `jobpilot.sqlite3` before replacing the folder, then restore your settings. The database schema is unchanged.
 
-## 🌍 Publish your own GitHub repository
+## 🌍 Share or contribute
 
-This source ZIP is **GitHub-ready**, but isn't published automatically. To create a public repository from your Mac:
+You are viewing the official **[JobPilot AI repository](https://github.com/Chirag0401/jobpilot-ai)**. Share this link, choose **Code → Download ZIP**, or clone using the command above.
 
-1. Install GitHub CLI with `brew install gh` (or follow https://cli.github.com/).
-2. Sign in with `gh auth login`.
-3. Run **`./publish-to-github.sh`** in the extracted project folder.
-4. Review the staged filenames and type `yes` when asked.
-
-The script creates a repository called `jobpilot-ai` in **your** authenticated account and pushes the code. It deliberately checks the files before making them public. If that name is already taken in your account, use the manual [`gh repo create`](https://cli.github.com/manual/gh_repo_create) command with a different name.
+To publish your own customized copy, click GitHub's **Fork** button. To suggest improvements, read [CONTRIBUTING.md](CONTRIBUTING.md) and open a pull request.
 
 ## 🧠 Using Multi-AI: OpenAI, Claude, or Gemini
 
@@ -161,7 +154,7 @@ jobpilot-ai/
 ├── .env.example                 # API key placeholders (no actual secrets)
 ├── start.sh / start.bat          # Standard edition launchers
 ├── start-multi-ai.sh / .bat      # Multi-AI edition launchers
-├── publish-to-github.sh          # One-command publishing helper
+├── publish-to-github.sh         # Optional standalone publishing helper
 ├── requirements.txt             # Common dependencies
 ├── requirements-browser.txt     # Optional Playwright dependency
 ├── requirements-dev.txt         # Test dependencies

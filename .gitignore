@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.sqlite3
+*.db
+results/
+profile_private.json
+config.local.yaml
+*.pdf
+*.docx
+.DS_Store
+.streamlit/secrets.toml
