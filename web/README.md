@@ -20,6 +20,19 @@ Choose OpenAI, Claude, or Gemini, paste an API key **temporarily**, then click *
 ### Hosted setup: GitHub auto-deployments + Supabase accounts
 Follow the [complete hosted setup guide](docs/DEPLOYMENT_SETUP.md) to authorize Vercel's GitHub app for this repository, connect the existing Vercel project, create the private Supabase saved-jobs database, and configure email authentication. The newer `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is supported, as well as the legacy anon key.
 
+
+### Troubleshooting magic-link sign-in
+
+If an email link opens `localhost:3000` after deploying, **do not edit or reuse the tokenized email link**. Open your project's [Supabase Auth URL Configuration](https://supabase.com/dashboard/project/bwfknsxztyywqsnyvjxf/auth/url-configuration):
+
+- **Site URL:** `https://jobpilot-ai-web.vercel.app`
+- **Allowed Redirect URLs:** `https://jobpilot-ai-web.vercel.app` (the exact URL, not localhost)
+- Keep `http://localhost:3000/**` only as an additional redirect for local development if needed.
+
+The production Vercel project must have `NEXT_PUBLIC_JOBPILOT_SITE_URL=https://jobpilot-ai-web.vercel.app` set before building. The app passes it through `emailRedirectTo`; Supabase only honors URLs permitted in Auth settings. After editing the dashboard, request a **new** magic link from the hosted site (not a local development tab). Expired or previously used links cannot be fixed by refreshing.
+
+If links keep reporting `otp_expired` immediately even with correct redirects, an email security scanner or preview may have visited the one-time link. Consider email **OTP code** authentication instead (requires a different Supabase email template), and check Supabase Auth logs before changing providers.
+
 ### Optional account sign-in and saved jobs
 Create a Supabase project, run `supabase/schema.sql` in its SQL editor, enable Email OTP/magic link, and add your deployment hostname to Auth allowed redirect URLs. Configure the environment variables from `.env.example` in Vercel and redeploy. Users will then be able to sign in and save jobs privately with row-level security policies.
 
