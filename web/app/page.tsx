@@ -126,7 +126,7 @@ export default function Page(){
  async function signIn(){
   setAuthMessage("");
   const sb=getSupabase();if(!sb){setAuthMessage("Accounts aren't enabled yet. The owner needs to connect Supabase first.");return;}
-  const {error}=await sb.auth.signInWithOtp({email,emailRedirectTo:window.location.origin});
+  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});
   setAuthMessage(error ? error.message : "Magic sign-in link sent. Check your inbox.");
  }
  function openJob(id:string){setActive(id);setTab("discover");setDraft("");}
