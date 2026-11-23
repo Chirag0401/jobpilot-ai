@@ -1,0 +1,66 @@
+# Safe, public configuration. Do NOT place contact details or credentials here.
+profile:
+  current_experience_years: 3  # Edit this for your own experience
+  current_focus: "DevOps, Platform Engineering and Site Reliability"
+  # EXAMPLES ONLY: Replace with skills you genuinely have before generating applications.
+  verified_experience:
+    - "AWS infrastructure and automation"
+    - "Kubernetes and OpenShift (OCP 4.x)"
+    - "Terraform, Helm and ArgoCD deployments"
+    - "GitLab CI, GitHub Actions, Jenkins and CI/CD troubleshooting"
+    - "Prometheus, Grafana, Loki and Linux operations"
+  # Add links to your own portfolio / GitHub if you wish.
+  portfolio_url: ""
+  github_url: ""
+preferences:
+  role_terms:
+    - "devops"
+    - "site reliability"
+    - "sre"
+    - "platform engineer"
+    - "cloud engineer"
+    - "infrastructure engineer"
+    - "cloud native"
+    - "openshift engineer"
+  technology_terms:
+    - "aws"
+    - "kubernetes"
+    - "openshift"
+    - "ocp"
+    - "terraform"
+    - "helm"
+    - "argocd"
+    - "gitlab"
+    - "github actions"
+    - "prometheus"
+    - "grafana"
+    - "linux"
+    - "ansible"
+    - "istio"
+    - "docker"
+    - "vault"
+    - "ci/cd"
+  preferred_cities: ["mumbai", "navi mumbai", "thane"]
+  acceptable_india_cities: ["pune", "hyderabad", "bangalore", "bengaluru", "chennai", "gurugram", "gurgaon", "noida", "delhi", "kolkata", "ahmedabad"]
+  allow_remote_india: true
+  include_other_india_cities: true
+  include_unverified_remote: false
+  exclude_seniority_terms: ["principal", "staff", "director", "vp ", "head of", "intern"]
+  min_score: 40
+  max_age_days: 30  # Date-unknown jobs are retained, visibly marked 'Unknown'.
+  freshness: "week" # day / week / month / all for search provider discovery
+search:
+  # These are the four X-Ray searches requested. Serper needs SERPER_API_KEY.
+  queries:
+    - 'site:jobs.ashbyhq.com ("DevOps Engineer" OR "SRE" OR "Platform Engineer") ("India" OR "Remote")'
+    - 'site:job-boards.greenhouse.io ("DevOps" OR "Platform Engineer") "India"'
+    - 'site:jobs.lever.co ("DevOps Engineer" OR "SRE") ("Mumbai" OR "Remote")'
+    - '("OpenShift" OR "OCP") ("DevOps" OR "Platform Engineer") "India" jobs'
+  results_per_query: 10
+  max_discovered_boards: 30
+# These are known public careers pages; configure your own and remove any you don't want.
+# No SERPER_API_KEY is necessary to check these boards.
+boards:
+  ashby: ["Linkup", "openobserve-careers", "sarvam", "uptimeai", "playpowerlabs"]
+  greenhouse: ["sonicwall"]
+  lever: ["mactores", "brightedge", "lingarogroup"]
