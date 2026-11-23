@@ -11,6 +11,16 @@
 
 > No API key? No problem. The Standard edition searches public job boards and creates editable application templates. Multi-AI is optional.
 
+## 🌐 Try the web beta — no installation needed
+
+**[🚀 Open JobPilot AI Web](https://jobpilot-ai-web.vercel.app/)**
+
+The new **Next.js web beta** lets anyone browse public DevOps/SRE/Platform job listings, filter by source and location, sort newest first, and use the optional **OpenAI / Claude / Gemini model picker** with their own API key. AI keys are used only for the selected request and are not saved in the app's database.
+
+**Currently available:** public job discovery, role details, direct links to employer applications, and reviewable AI answer drafts. **Not enabled yet:** personal accounts and saved jobs (require Supabase configuration), automated job submissions, and alerts. Always verify location eligibility and posting status with the employer. The original Python/Streamlit edition below is still available and has more source connector options.
+
+The web application's source code and setup instructions live in [`web/`](web/README.md). The current hosted deployment is not yet linked to GitHub CI/CD; GitHub app repository access must be granted in Vercel before pushes deploy automatically.
+
 ## 🧩 How it works
 
 ```mermaid
