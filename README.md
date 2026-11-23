@@ -19,7 +19,7 @@ The new **Next.js web beta** lets anyone browse public DevOps/SRE/Platform job l
 
 **Currently available:** public job discovery, role details, direct links to employer applications, and reviewable AI answer drafts. **Not enabled yet:** personal accounts and saved jobs (require Supabase configuration), automated job submissions, and alerts. Always verify location eligibility and posting status with the employer. The original Python/Streamlit edition below is still available and has more source connector options.
 
-The web application's source code and setup instructions live in [`web/`](web/README.md). The current hosted deployment is not yet linked to GitHub CI/CD; GitHub app repository access must be granted in Vercel before pushes deploy automatically.
+The web application's source code is in [`web/`](web/README.md). To enable GitHub auto-deployments and Supabase sign-in/saved jobs, follow the [hosted setup guide](web/docs/DEPLOYMENT_SETUP.md). These integrations require you to authorize the GitHub App and create/connect your own Supabase project; code changes alone do not enable them.
 
 ## 🧩 How it works
 
