@@ -101,13 +101,22 @@ GEMINI_API_KEY=
 SERPER_API_KEY=
 ```
 
-| Provider | Where to get a key | Example model |
-|---|---|---|
-| OpenAI | https://platform.openai.com/api-keys | `gpt-4.1-mini` |
-| Claude (Anthropic) | https://console.anthropic.com/settings/keys | `claude-sonnet-4-5` |
-| Gemini (Google) | https://aistudio.google.com/apikey | `gemini-2.5-flash` |
+### 🔑 Where do I get the API keys?
 
-Model availability changes; if a default model is unavailable for your account, select an available ID. **ChatGPT Plus, Claude Pro and Gemini subscriptions do not automatically include paid API usage.** Provider API billing is separate. API requests use providers' official HTTPS endpoints.
+**You do not need all four keys.** Choose one AI provider if you want AI-generated drafts; Serper is optional for finding more jobs. Free **Template** mode and the configured company job feeds work without any keys.
+
+| Key | What does it do? | Get it in one step |
+|---|---|---|
+| `OPENAI_API_KEY` | Generates application answers using OpenAI models. | [OpenAI API keys](https://platform.openai.com/api-keys) → sign in → **Create new secret key** |
+| `ANTHROPIC_API_KEY` | Generates application answers using Claude models. | [Claude Platform](https://platform.claude.com/settings/keys) → sign in → **Create key** |
+| `GEMINI_API_KEY` | Generates application answers using Google's Gemini models. | [Google AI Studio](https://aistudio.google.com/apikey) → sign in → **Create API key** |
+| `SERPER_API_KEY` | Lets JobPilot search Google via Serper to discover **more job boards**. **Not an AI model key.** | [Serper](https://serper.dev/) → **Sign up** → copy your API key from the dashboard |
+
+**How to use a key:** Copy `.env.example` to a new file named `.env`, paste your selected key after `=`, save, and restart the app. For AI keys, you can alternatively paste the key in the password field in the Multi-AI sidebar; Serper uses the `.env` entry. Never share your key or commit `.env` to GitHub.
+
+**What is Serper?** A third-party Google Search API. Here, it runs the Google X-Ray queries from `config.yaml`, discovers company careers pages, and lets JobPilot fetch supported Ashby/Greenhouse/Lever boards. It is **optional**, and Google search freshness is **not** the same as the job's publication date.
+
+**Costs:** Provider API usage/billing is separate from ChatGPT Plus, Claude Pro and Gemini app subscriptions. Serper has its own quota/pricing. Check the provider dashboard before enabling paid usage. Models can change; choose a model ID currently available to your account.
 
 ## 🔎 Search for jobs
 
@@ -141,6 +150,10 @@ Open **`config.yaml`** and edit these fields:
 - `boards`: add company boards you like.
 
 Never put your email, resume, or API keys in `config.yaml` if you plan to share it publicly.
+
+## 📖 Read the codebase
+
+New to the project? Follow the [beginner-friendly codebase walkthrough](docs/CODEBASE_WALKTHROUGH.md): it explains the file structure, request flow, job matching, API calls, SQLite, the browser helper, and how to run tests.
 
 ## 📁 Project structure
 
