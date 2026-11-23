@@ -48,6 +48,19 @@ export default function Page(){
  const [message,setMessage]=useState("");
  const supabaseReady=!!getSupabase();
  useEffect(()=>{
+   // Supabase includes authentication failures in the URL fragment after redirect.
+   // Surface them in our existing sign-in modal, without leaving error details in URL.
+   const fragment=new URLSearchParams(window.location.hash.replace(/^#/, ""));
+   const errorCode=fragment.get("error_code") || fragment.get("error");
+   if(errorCode){
+     setAuthOpen(true);
+     setAuthMessage(errorCode==="otp_expired"
+       ? "This sign-in link has expired or has already been used. Enter your email to request a new one."
+       : "Sign-in did not complete. Please request a fresh email link.");
+     window.history.replaceState(null,"",window.location.pathname+window.location.search);
+   }
+ },[]);
+ useEffect(()=>{
    const sb=getSupabase();if(!sb)return;
    sb.auth.getUser().then(({data})=>setUser(data.user));
    const {data:{subscription}}=sb.auth.onAuthStateChange((_event,session)=>setUser(session?.user||null));
@@ -126,7 +139,10 @@ export default function Page(){
  async function signIn(){
   setAuthMessage("");
   const sb=getSupabase();if(!sb){setAuthMessage("Accounts aren't enabled yet. The owner needs to connect Supabase first.");return;}
-  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin}});
+  // Production uses its explicit public URL. Local development falls back to its own origin.
+  // Supabase Auth must separately allow this destination under URL Configuration.
+  const redirectTo=(process.env.NEXT_PUBLIC_JOBPILOT_SITE_URL || window.location.origin).replace(/\/$/, "");
+  const {error}=await sb.auth.signInWithOtp({email:email.trim(),options:{emailRedirectTo:redirectTo}});
   setAuthMessage(error ? error.message : "Magic sign-in link sent. Check your inbox.");
  }
  function openJob(id:string){setActive(id);setTab("discover");setDraft("");}
