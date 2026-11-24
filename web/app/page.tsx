@@ -112,7 +112,7 @@ export default function Page(){
   try{
    const response=await fetch("/api/discover",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify({apiKey:serperKey,portalIds,role:searchRole,location:searchLocation,
-     careerSites:careerUrls(),depth:searchDepth,freshness})});
+     careerSites:careerUrls().slice(0,5),depth:searchDepth,freshness})});
    const data=await response.json();
    if(!response.ok)throw Error(data.error||"Search could not complete");
    const results:Job[]=data.jobs||[];
@@ -311,30 +311,29 @@ export default function Page(){
       {message&&<div className="notice error" role="alert"><AlertCircle size={16}/>{message}<button onClick={()=>setMessage("")} aria-label="Dismiss"><X size={16}/></button></div>}
       {hasSearched ? <>
       <div className="metrics">
-      <div><span>OPEN ROLES FOUND</span><strong>{loading?"—":jobs.length}</strong><small>Across available sources</small></div>
-      <div><span>COMPANIES</span><strong>{loading?"—":new Set(jobs.map(j=>j.company)).size}</strong><small>Hiring teams discovered</small></div>
+      <div><span>RESULTS FOR THIS SEARCH</span><strong>{loading?"—":jobs.length}</strong><small>Your selected role</small></div>
+      <div><span>SOURCES</span><strong>{loading?"—":new Set(jobs.map(j=>j.source)).size}</strong><small>Sources matching your search</small></div>
       <div><span>SAVED OPPORTUNITIES</span><strong>{saved.length}</strong><small>{user?"Private to your account":"Sign in to save jobs"}</small></div>
      </div>
-     <div className="section-row"><div><h2>Explore opportunities</h2><p>Explore recent DevOps, SRE and Platform roles.</p></div>
-      <button className="outline-button" onClick={()=>void scan()} disabled={loading}><RefreshCw size={16} className={loading?"spin":""}/> Refresh</button></div>
+     <div className="section-row"><div><h2>Results for {lastSearch}</h2><p>Only your latest search; searching again replaces the old results.</p></div><button className="outline-button" onClick={()=>void (searchKind==="portals"?searchPortals():searchCompanies())} disabled={loading}><RefreshCw size={16} className={loading?"spin":""}/> Search again</button></div>
      <div className="filterbar">
-      <label className="searchbox"><Search size={18}/><input placeholder="Search roles, companies, technologies..." value={query} onChange={e=>setQuery(e.target.value)} /></label>
-      <label className="filterselect"><MapPin size={16}/><select value={where} onChange={e=>setWhere(e.target.value)}><option value="all">All India</option><option value="mumbai">Mumbai area</option><option value="remote">Remote</option></select></label>
+      <label className="searchbox"><Search size={18}/><input placeholder="Filter these results..." value={query} onChange={e=>setQuery(e.target.value)} /></label>
+      <label className="filterselect"><MapPin size={16}/><select value={where} onChange={e=>setWhere(e.target.value)}><option value="all">All locations (including unverified)</option><option value="mumbai">Mumbai area</option><option value="remote">Remote</option></select></label>
       <label className="filterselect"><SlidersHorizontal size={16}/><select value={source} onChange={e=>setSource(e.target.value)}><option value="all">All sources</option>{sources.map(s=><option key={s} value={s}>{s}</option>)}</select></label>
-      <label className="filterselect"><Clock3 size={16}/><select value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest first</option><option value="score">Best match</option></select></label>
+      <label className="filterselect"><Clock3 size={16}/><select value={sort} onChange={e=>setSort(e.target.value)}><option value="score">Most relevant</option><option value="newest">Newest (if available)</option></select></label>
      </div>
      
-      {warnings.length>0&&<div className="notice"><AlertCircle size={16}/> {warnings.length} source(s) unavailable during this scan. Other sources may still have results.</div>}
-     {message&&<div className="notice error"><AlertCircle size={16}/>{message}<button onClick={()=>setMessage("")} aria-label="Dismiss"><X size={16}/></button></div>}
+      {warnings.length>0&&<div className="notice"><AlertCircle size={16}/> {warnings.length} source warning(s): {warnings.slice(0,3).join(" · ")}{warnings.length>3?" (and more)":""}</div>}
+     
      <div className="listing-layout">
       <div className="listing">
-       <div className="listing-head"><span>{loading?"Searching sources...":filtered.length+" matching opportunities"}</span><small>{scannedAt?"Updated "+new Date(scannedAt).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}):"Public job feeds"}</small></div>
-       {loading?<div className="empty"><RefreshCw size={30} className="spin"/><h3>Scanning job sources</h3><p>Checking published company career feeds.</p></div>:
-        filtered.length===0?<div className="empty"><Search size={30}/><h3>No matching roles</h3><p>Try fewer filters or refresh the search.</p></div>:
+       <div className="listing-head"><span>{loading?"Searching selected sources...":filtered.length+" matching results"}</span><small>{scannedAt?"Updated "+new Date(scannedAt).toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}):"Public job feeds"}</small></div>
+       {loading?<div className="empty"><RefreshCw size={30} className="spin"/><h3>Searching for {lastSearch}...</h3><p>Checking only the sources you selected.</p></div>:
+        filtered.length===0?<div className="empty"><Search size={30}/><h3>No matching jobs in these sources</h3><p>Broaden the role or location, or use the deeper search. Indexed coverage is not exhaustive.</p></div>:
         filtered.map(j=><button key={j.id} onClick={()=>setActive(j.id)} className={selected?.id===j.id?"job-card active":"job-card"}>
          <div className="job-card-top"><span className="company-avatar">{sourceLogo(j.company)}</span>
           <div className="job-head"><strong>{j.title}</strong><span>{j.company}</span></div>
-          <span className="fit">{j.score}% fit</span>
+          <span className="fit">{j.score>=90?"Strong title match":j.score>=65?"Role match":"Possible match"}</span>
          </div>
          <div className="job-meta"><span><MapPin size={13}/>{j.location}</span><span><Clock3 size={13}/>{dateLabel(j.postedAt)}</span></div>
          <div className="job-bottom"><span className="source-tag">{j.source}</span><span className="job-tags">{j.tags.slice(0,2).join(" · ")}</span><ChevronRight size={17}/></div>
@@ -346,9 +345,9 @@ export default function Page(){
        <h2>{selected.title}</h2><div className="detail-company"><Building2 size={16}/>{selected.company}</div>
        <div className="detail-info"><span><MapPin size={15}/>{selected.location}</span><span><Clock3 size={15}/>{dateLabel(selected.postedAt)} · {selected.dateKind}</span></div>
        <div className="detail-divider"/>
-       <div className="matchbar"><div><span>Keyword match</span><strong>{selected.score}/100</strong></div><div className="progress"><i style={{width:selected.score+"%"}}/></div><small>Skills and location relevance, not interview probability.</small></div>
-       <h3>Technologies mentioned</h3><div className="chips">{selected.tags.length?selected.tags.map(t=><span key={t}>{t}</span>):<p className="muted">Review full job description for requirements.</p>}</div>
-       <h3>About this opportunity</h3><p className="description">{selected.description.slice(0,1000)||"Open the official listing for its description."}</p>
+       <div className="matchbar"><div><span>Role keyword relevance</span><strong>{selected.score}/100</strong></div><div className="progress"><i style={{width:selected.score+"%"}}/></div><small>Based on role text, not your resume, eligibility or interview probability.</small></div>
+       <h3>Listing details</h3><div className="chips">{selected.tags.length?selected.tags.map(t=><span key={t}>{t}</span>):<p className="muted">Review full job description for requirements.</p>}</div>
+       <h3>{selected.source.includes("Google index")?"Google search excerpt (unverified)":"About this opportunity"}</h3><p className="description">{selected.description.slice(0,1000)||"Open the official listing for its description."}</p>
        <div className="detail-buttons"><button className="primary-button" onClick={()=>applyLink(selected.url)}>View & apply <ExternalLink size={16}/></button>
         <button className="outline-button save-button" onClick={()=>void save(selected)}>{saved.some(x=>x.job_id===selected.id)?<Check size={16}/>:<Bookmark size={16}/>} {saved.some(x=>x.job_id===selected.id)?"Saved":"Save"}</button></div>
        <button className="ai-link" onClick={()=>{setTab("ai");setDraft("");}}><Sparkles size={15}/> Draft an application with AI <ArrowUpRight size={15}/></button>
