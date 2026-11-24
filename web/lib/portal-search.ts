@@ -26,7 +26,10 @@ export type SearchDepth=1|2;
 type Organic={title?:string;link?:string;snippet?:string;date?:string};
 type SearchTarget={name:string;domain:string;site:string;id:string};
 type SourceStat={source:string;inspected:number;matched:number};
-export type SearchStats={queries:number;inspected:number;matched:number;duplicates:number;sources:SourceStat[]};
+export type SearchStats={queries:number;successfulQueries:number;failedQueries:number;inspected:number;matched:number;duplicates:number;sources:SourceStat[]};
+export class SerperSearchError extends Error {
+ constructor(message:string,public readonly status:number){super(message);this.name="SerperSearchError";}
+}
 export type SearchResult={jobs:Job[];warnings:string[];stats:SearchStats};
 
 const words=(s:string)=>s.toLowerCase().replace(/[^\p{L}\p{N}+#. -]/gu," ").replace(/\s+/g," ").trim();
@@ -156,66 +159,134 @@ export function extractIndexedJob(hit:Organic,target:SearchTarget,role:string,lo
   description:snippet||"Indexed search result. Verify the position on the original site.",
   score,tags:["Indexed result"]};
 }
+/**
+ * Search reliability rules:
+ * - Verify ONE Serper request before fan-out (never spend 28 requests on an HTTP 400).
+ * - Use the previously working conservative num:10 request, omit page=1.
+ * - If an optional time filter is rejected (400), retry ONCE without it and warn.
+ * - If narrow site path is rejected (400), retry ONCE on the same public site's domain.
+ * - Paginate only when the preceding page had 10 organic hits.
+ * - Never report HTTP errors as a successful "zero jobs" search.
+ */
 export async function searchIndexedJobs(
- key:string, ids:string[],role:string,location:string,careerSites:string[],
+ key:string,ids:string[],role:string,location:string,careerSites:string[],
  opts:{depth?:SearchDepth;freshness?:Freshness}={}
 ):Promise<SearchResult>{
- const phrases=rolePhrases(role);
- if(!phrases.length)throw Error("Enter a job role to search for");
+ if(!rolePhrases(role).length)throw new Error("Enter a job role to search for");
  const selected=[...new Set(ids)].slice(0,PORTALS.length);
  const targets:SearchTarget[]=selected.flatMap(id=>{
   const p=PORTALS.find(x=>x.id===id);
   return p?[{id:p.id,name:p.name,domain:p.domain,site:p.site}]:[];
  });
- targets.push(...validateCareerDomains(careerSites).map(domain=>({id:"company",name:"Company careers",domain,site:domain})));
+ targets.push(...validateCareerDomains(careerSites).map(domain=>({
+  id:"company",name:"Company careers · "+domain,domain,site:domain
+ })));
  const bounded=targets.slice(0,16);
+ if(!bounded.length)throw new Error("Select a portal or enter a company domain");
  const depth=opts.depth===2?2:1;
- const freshness=opts.freshness==="week"?"qdr:w":opts.freshness==="month"?"qdr:m":undefined;
- const stats:SearchStats={queries:0,inspected:0,matched:0,duplicates:0,sources:[]};
+ const requestedTbs=opts.freshness==="week"?"qdr:w":opts.freshness==="month"?"qdr:m":undefined;
+ let tbs:string|undefined=requestedTbs;
+ let useDomainOnly=false;
+ let stopEarly=false;
+ const stats:SearchStats={queries:0,successfulQueries:0,failedQueries:0,inspected:0,matched:0,duplicates:0,sources:[]};
  const warnings:string[]=[];
- const results:Job[]=[];
- const tasks=bounded.flatMap(target=>Array.from({length:depth},(_,i)=>({target,page:i+1})));
+ const found:Job[]=[];
  const counts=new Map<string,{inspected:number;matched:number}>();
- // Eight concurrent requests max: depth 2 across 14 sources remains within function timeout in normal operation.
- for(let offset=0;offset<tasks.length;offset+=8){
-  const batch=tasks.slice(offset,offset+8);
-  await Promise.all(batch.map(async({target,page})=>{
-   const keyName=target.name;
-   const sourceCount=counts.get(keyName)||{inspected:0,matched:0};
-   counts.set(keyName,sourceCount);
-   stats.queries+=1;
-   try{
-    const response=await fetch("https://google.serper.dev/search",{
-     method:"POST",cache:"no-store",redirect:"error",
-     headers:{"Content-Type":"application/json","X-API-KEY":key},
-     body:JSON.stringify({q:buildQuery(role,location,target.site),num:20,page,gl:googleLocale(location),hl:"en",...(freshness?{tbs:freshness}:{})}),
-     signal:AbortSignal.timeout(12000)
-    });
-    if(!response.ok){
-     warnings.push(response.status===401||response.status===403
-      ?"Serper rejected the provided API key."
-      :response.status===429?"Serper quota or rate limit reached."
-      :target.name+" search unavailable (HTTP "+response.status+").");
-     return;
-    }
-    const data=await response.json() as {organic?:Organic[]};
-    const organic=Array.isArray(data.organic)?data.organic.slice(0,30):[];
-    stats.inspected+=organic.length;
-    sourceCount.inspected+=organic.length;
-    for(const hit of organic){
-     const result=extractIndexedJob(hit,target,role,location);
-     if(result){results.push(result);stats.matched++;sourceCount.matched++;}
-    }
-   }catch{warnings.push(target.name+" search request failed.");}
+ function count(target:SearchTarget){
+  const name=target.name;
+  let entry=counts.get(name);
+  if(!entry){entry={inspected:0,matched:0};counts.set(name,entry);}
+  return entry;
+ }
+ function errorMessage(status:number){
+  if(status===401||status===403)return "Serper rejected the API key (HTTP "+status+"). Check the key in your Serper dashboard.";
+  if(status===429)return "Serper rate limit or search credits have been reached (HTTP 429). Check your account quota.";
+  if(status===400)return "Serper rejected the request (HTTP 400), even after using the basic search format. No job listings were retrieved. Check the API key, provider access and search settings.";
+  return "Serper returned HTTP "+status+" instead of job search results.";
+ }
+ type ProviderReply={status:number;organic:Organic[]};
+ async function request(target:SearchTarget,page:number):Promise<ProviderReply>{
+  stats.queries++;
+  const query=buildQuery(role,location,useDomainOnly?target.domain:target.site);
+  const payload={
+   q:query,num:10,gl:googleLocale(location),hl:"en",
+   ...(page>1?{page}:{}),
+   ...(tbs?{tbs}:{})
+  };
+  try{
+   const response=await fetch("https://google.serper.dev/search",{
+    method:"POST",cache:"no-store",redirect:"error",
+    headers:{"Content-Type":"application/json","X-API-KEY":key},
+    body:JSON.stringify(payload),signal:AbortSignal.timeout(12000)
+   });
+   if(!response.ok){stats.failedQueries++;return {status:response.status,organic:[]};}
+   const result=await response.json() as {organic?:Organic[]};
+   stats.successfulQueries++;
+   return {status:200,organic:Array.isArray(result.organic)?result.organic.slice(0,10):[]};
+  }catch{
+   stats.failedQueries++;
+   return {status:503,organic:[]};
+  }
+ }
+ function addResults(target:SearchTarget,hits:Organic[]){
+  const item=count(target);
+  stats.inspected+=hits.length;item.inspected+=hits.length;
+  for(const hit of hits){
+   const job=extractIndexedJob(hit,target,role,location);
+   if(!job)continue;
+   stats.matched++;item.matched++;found.push(job);
+  }
+ }
+ // Probe first. Older JobPilot searches worked using num=10 with no explicit first-page index.
+ // On 400, relax only optional parameters; never retry authentication or quota failures.
+ const first=bounded[0];
+ let probe=await request(first,1);
+ if(probe.status===400 && tbs){
+  tbs=undefined;
+  warnings.push("Serper rejected the search-index recency filter; results are NOT restricted to the chosen timeframe.");
+  probe=await request(first,1);
+ }
+ if(probe.status===400 && first.site!==first.domain){
+  useDomainOnly=true;
+  warnings.push("Serper rejected a narrow site query; broader portal-domain search was used instead.");
+  probe=await request(first,1);
+ }
+ if(probe.status!==200)throw new SerperSearchError(errorMessage(probe.status),probe.status);
+ addResults(first,probe.organic);
+ // Deeper uses a second page of 10, only if there is evidence another page might exist.
+ async function secondPage(target:SearchTarget,firstHits:Organic[]){
+  if(depth!==2||firstHits.length<10||stopEarly)return;
+  const next=await request(target,2);
+  if(next.status===200)addResults(target,next.organic);
+  else {
+   warnings.push(next.status===400
+    ?target.name+" has no accessible second page (HTTP 400); first-page results were retained."
+    :target.name+": "+errorMessage(next.status));
+   if(next.status===429||next.status===401||next.status===403)stopEarly=true;
+  }
+ }
+ await secondPage(first,probe.organic);
+ // Scan additional sources in small batches; preserve any good results on partial outages.
+ for(let i=1;i<bounded.length && !stopEarly;i+=4){
+  await Promise.all(bounded.slice(i,i+4).map(async target=>{
+   const response=await request(target,1);
+   if(response.status===200){
+    addResults(target,response.organic);
+    await secondPage(target,response.organic);
+   }else {
+    warnings.push(target.name+": "+errorMessage(response.status));
+    if([401,403,429].includes(response.status))stopEarly=true;
+   }
   }));
  }
- const byUrl=new Map<string,Job>();
- for(const item of results){
-  const old=byUrl.get(item.url);
-  if(!old||item.score>old.score)byUrl.set(item.url,item);
+ const unique=new Map<string,Job>();
+ for(const job of found){
+  const prev=unique.get(job.url);
+  if(!prev||prev.score<job.score)unique.set(job.url,job);
  }
- stats.duplicates=results.length-byUrl.size;
- stats.sources=bounded.map(t=>({source:t.name,...(counts.get(t.name)||{inspected:0,matched:0})}));
- const jobs=[...byUrl.values()].sort((a,b)=>b.score-a.score||a.title.localeCompare(b.title)).slice(0,400);
+ stats.duplicates=found.length-unique.size;
+ stats.sources=bounded.map(source=>({source:source.name,...(counts.get(source.name)||{inspected:0,matched:0})}));
+ const jobs=[...unique.values()].sort((a,b)=>b.score-a.score||a.title.localeCompare(b.title)).slice(0,400);
+ if(stats.successfulQueries===0)throw new SerperSearchError("No Serper requests succeeded; no job results were checked.",502);
  return {jobs,warnings:[...new Set(warnings)],stats};
 }
