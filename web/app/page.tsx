@@ -13,7 +13,7 @@ const providerModels:Record<string,string[]> = {
  OpenAI:["gpt-4.1-mini"],Claude:["claude-sonnet-4-5"],Gemini:["gemini-2.5-flash"]
 };
 function dateLabel(date:string|null) {
- if(!date)return "Date unknown";
+ if(!date)return "Posting date unverified";
  const days=Math.floor((Date.now()-new Date(date).getTime())/86400000);
  if(!Number.isFinite(days))return "Date unknown";
  if(days<=0)return "Today";
@@ -25,14 +25,18 @@ function sourceLogo(source:string){return source.slice(0,1).toUpperCase();}
 export default function Page(){
  const [tab,setTab]=useState<Tab>("discover");
  const [jobs,setJobs]=useState<Job[]>([]);
- const [loading,setLoading]=useState(true);
+ const [loading,setLoading]=useState(false);
+ const [hasSearched,setHasSearched]=useState(false);
+ const [searchKind,setSearchKind]=useState<"portals"|"company"|null>(null);
+ const [lastSearch,setLastSearch]=useState("");
+ const [searchStats,setSearchStats]=useState<{queries?:number;inspected:number;matched:number;duplicates?:number}|null>(null);
  const [warnings,setWarnings]=useState<string[]>([]);
  const [scannedAt,setScannedAt]=useState("");
  const [active,setActive]=useState<string>("");
  const [query,setQuery]=useState("");
  const [where,setWhere]=useState("all");
  const [source,setSource]=useState("all");
- const [sort,setSort]=useState("newest");
+ const [sort,setSort]=useState("score");
  const [user,setUser]=useState<User|null>(null);
  const [saved,setSaved]=useState<Saved[]>([]);
  const [authOpen,setAuthOpen]=useState(false);
@@ -52,8 +56,10 @@ export default function Page(){
  const [message,setMessage]=useState("");
  const [serperKey,setSerperKey]=useState("");
  const [portalIds,setPortalIds]=useState<string[]>(["linkedin","indeed","naukri","workday","wellfound"]);
- const [searchRole,setSearchRole]=useState("DevOps OR SRE OR Platform Engineer");
+ const [searchRole,setSearchRole]=useState("");
  const [searchLocation,setSearchLocation]=useState("India");
+ const [searchDepth,setSearchDepth]=useState<1|2>(1);
+ const [freshness,setFreshness]=useState<"any"|"week"|"month">("month");
  const [careerUrlsText,setCareerUrlsText]=useState("");
  const [discovering,setDiscovering]=useState(false);
  const [careersLoading,setCareersLoading]=useState(false);
@@ -86,56 +92,61 @@ export default function Page(){
      setSaved((data||[]) as Saved[]);
    });
  },[user]);
- async function scan(){
-   setLoading(true);setMessage("");
-   try{
-     const response=await fetch("/api/jobs",{cache:"no-store"});
-     const data=await response.json();
-     if(!response.ok)throw Error(data.error||"Job sources unavailable");
-     setJobs(data.jobs||[]);setWarnings(data.warnings||[]);setScannedAt(data.scannedAt||"");
-     setActive(previous=>previous || data.jobs?.[0]?.id || "");
-   }catch(e){setMessage(e instanceof Error?e.message:"Unable to load jobs");}
-   finally{setLoading(false);}
- }
- useEffect(()=>{void scan();},[]);
- function appendJobs(incoming:Job[]){
-  setJobs(old=>{
-   const byUrl=new Map<string,Job>();
-   for(const job of [...old,...incoming]){
-    const previous=byUrl.get(job.url);
-    if(!previous || (!previous.postedAt && job.postedAt))byUrl.set(job.url,job);
-   }
-   return [...byUrl.values()].sort((a,b)=>(b.postedAt||"").localeCompare(a.postedAt||"")||b.score-a.score);
-  });
-  if(incoming[0])setActive(previous=>previous||incoming[0].id);
+ function resetSearch(kind:"portals"|"company"){
+  setHasSearched(true);
+  setSearchKind(kind);
+  setLastSearch(searchRole.trim());
+  setJobs([]);setActive("");
+  setSource("all");setWhere("all");setQuery("");setSort("score");
+  setWarnings([]);setSearchStats(null);setScannedAt("");
+  setDiscoveryNotice("");setMessage("");setLoading(true);
  }
  const careerUrls=()=>careerUrlsText.split(/[\r\n]+/).map(x=>x.trim()).filter(Boolean).slice(0,6);
  async function searchPortals(){
-  setMessage("");setDiscoveryNotice("");setDiscovering(true);
+  if(discovering||careersLoading)return;
+  if(!searchRole.trim()){setMessage("Enter the job role you want first.");return;}
+  if(!portalIds.length&&!careerUrls().length){setMessage("Select at least one portal or company website.");return;}
+  if(serperKey.trim().length<8){setMessage("Enter a valid Serper API key for indexed portal search.");return;}
+  resetSearch("portals");
+  setDiscovering(true);
   try{
    const response=await fetch("/api/discover",{method:"POST",headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({apiKey:serperKey,portalIds,role:searchRole,location:searchLocation,careerSites:careerUrls()})});
+    body:JSON.stringify({apiKey:serperKey,portalIds,role:searchRole,location:searchLocation,
+     careerSites:careerUrls(),depth:searchDepth,freshness})});
    const data=await response.json();
-   if(!response.ok)throw Error(data.error||"Portal search failed");
-   appendJobs(data.jobs||[]);
-   setDiscoveryNotice("Found "+(data.jobs||[]).length+" indexed results using "+data.queries+" Serper queries. Dates and eligibility are not verified.");
-   if(data.warnings?.length)setWarnings(prev=>[...new Set([...prev,...data.warnings])].slice(0,25));
-  }catch(e){setMessage(e instanceof Error?e.message:"Unable to search indexed portals");}
-  finally{setDiscovering(false);}
+   if(!response.ok)throw Error(data.error||"Search could not complete");
+   const results:Job[]=data.jobs||[];
+   setJobs(results);setActive(results[0]?.id||"");
+   setSearchStats(data.stats||null);
+   setScannedAt(new Date().toISOString());
+   const metrics=data.stats||{};
+   setDiscoveryNotice("Search complete: "+results.length+" relevant results from "+(metrics.inspected||0)+
+    " indexed hits across "+(metrics.queries||0)+" queries. Unverified dates and locations are clearly labeled.");
+   setWarnings(data.warnings||[]);
+  }catch(e){setMessage(e instanceof Error?e.message:"Unable to search selected portals");}
+  finally{setDiscovering(false);setLoading(false);}
  }
  async function searchCompanies(){
-  setMessage("");setDiscoveryNotice("");setCareersLoading(true);
+  if(discovering||careersLoading)return;
+  if(!searchRole.trim()){setMessage("Enter the job role you want first.");return;}
+  const urls=careerUrls();
+  if(!urls.length){setMessage("Add at least one supported company career URL.");return;}
+  resetSearch("company");
+  setCareersLoading(true);
   try{
-   const urls=careerUrls();
-   if(!urls.length)throw Error("Enter one or more supported company career URLs");
-   const response=await fetch("/api/company",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({urls})});
+   const response=await fetch("/api/company",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({urls,role:searchRole,location:searchLocation})});
    const data=await response.json();
-   if(!response.ok)throw Error(data.error||"Unable to check company career pages");
-   appendJobs(data.jobs||[]);
-   setDiscoveryNotice("Found "+(data.jobs||[]).length+" role matches on supported company career feeds.");
-   if(data.warnings?.length)setWarnings(prev=>[...new Set([...prev,...data.warnings])].slice(0,25));
-  }catch(e){setMessage(e instanceof Error?e.message:"Unable to scan company pages");}
-  finally{setCareersLoading(false);}
+   if(!response.ok)throw Error(data.error||"Unable to search career pages");
+   const results:Job[]=data.jobs||[];
+   setJobs(results);setActive(results[0]?.id||"");
+   setSearchStats(data.stats||null);
+   setScannedAt(new Date().toISOString());
+   setDiscoveryNotice("Career scan complete: "+results.length+" relevant results from "+
+    (data.stats?.inspected||0)+" public ATS job entries.");
+   setWarnings(data.warnings||[]);
+  }catch(e){setMessage(e instanceof Error?e.message:"Unable to search company career pages");}
+  finally{setCareersLoading(false);setLoading(false);}
  }
  // A client-side cooldown reduces accidental duplicate email requests.
  // It cannot override or reset Supabase's project-wide SMTP quota.
@@ -265,7 +276,7 @@ export default function Page(){
     {tab==="discover" ? <>
      <div className="hero"><div className="eyebrow"><Sparkles size={15}/> INTELLIGENT JOB DISCOVERY</div>
       <h1>Your next big move <span>starts here.</span></h1>
-      <p>One place for jobs across company career pages and trusted remote feeds. Relevant openings, newest first.</p>
+      <p>Search for your role, choose the websites you trust, and see only results from that search. No preset jobs or career assumptions.</p>
       <div className="hero-glow"/>
      </div>
      <div className="metrics">
