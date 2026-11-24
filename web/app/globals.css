@@ -12,3 +12,24 @@
 @media(max-width:1200px){.sidebar{width:215px}.content{padding:28px 24px}.topbar{padding:0 25px}.listing-layout{grid-template-columns:1fr}.detail{position:static}.job-card.active{box-shadow:inset 3px 0 #64e4bb}}
 @media(max-width:850px){.sidebar{width:72px;padding:22px 8px}.brand{padding:0;justify-content:center}.brand>div:last-child,.side-label,.nav-item:not(svg),.sidebar-sources,.side-bottom{font-size:0}.brand strong,.brand small,.side-label,.sidebar-sources,.tip,.github-link{display:none}.nav-item{justify-content:center;font-size:0}.nav-item .count,.nav-right{display:none}.nav-item svg{width:21px;height:21px}.topbar{height:68px}.filterbar{flex-wrap:wrap}.searchbox{flex-basis:100%}.studio-grid{grid-template-columns:1fr}.metrics{gap:10px}}
 @media(max-width:620px){.sidebar{width:0;padding:0;border:0;overflow:hidden}.topbar{padding:0 17px}.content{padding:20px 14px}.hero{padding:26px 23px;min-height:190px}.hero h1{font-size:25px}.hero p{font-size:12px}.metrics>div{padding:13px;min-height:92px}.metrics span{font-size:8px}.metrics strong{font-size:24px}.metrics small{font-size:9px}.section-row h2{font-size:18px}.filterselect{flex:1;justify-content:center}.listing-layout{grid-template-columns:1fr}.detail{padding:20px}.live{display:none}.studio-panel{padding:18px}.job-card{padding:15px}.job-meta,.job-bottom{margin-left:0}.job-card-top{gap:9px}.job-head strong{font-size:12px}}
+
+/* Optional extended job discovery */
+.discovery-panel{margin:12px 0 18px;padding:23px;background:#101c2b;border:1px solid #2b4152;border-radius:14px}
+.discovery-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:21px;color:#7be1b9}
+.discovery-header h3{font-size:18px;color:#e8f3f6;font-family:Manrope,system-ui,sans-serif;margin:0 0 7px}
+.discovery-header p{font-size:12px;color:#8ea2b4;line-height:1.6;margin:0}
+.discovery-grid{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.discovery-card{padding:20px;border:1px solid #2b3d51;border-radius:12px;background:#152337;min-width:0}
+.discovery-card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:18px;font-size:12px}
+.discovery-card-title strong{font-size:12px}.discovery-card-title a{display:flex;gap:4px;align-items:center;color:#78dfb7;font-size:11px;font-weight:700}
+.discovery-row{display:grid;grid-template-columns:1.4fr .6fr;gap:12px}
+.discovery-row .field{min-width:0}
+.portal-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:20px;max-height:244px;overflow:auto;padding:3px}
+.portal-option{display:flex;align-items:center;gap:8px;font-size:11px;color:#b0c3d2;cursor:pointer;line-height:1.4}
+.portal-option input{accent-color:#63ddb5;cursor:pointer;flex-shrink:0;width:15px;height:15px}
+.text-action{background:none;border:0;color:#7be6bd;font-size:11px;font-weight:700;padding:4px;cursor:pointer}
+.discovery-note{color:#8499aa;font-size:11px;line-height:1.7;margin:13px 0 0}
+.discovery-notice{font-size:12px;padding:13px 16px;margin-top:15px;background:#14352d;border:1px solid #29614e;border-radius:9px;color:#b0efd5;line-height:1.6}
+.mini-tag{font-size:10px;font-weight:700;border:1px solid #385266;border-radius:5px;padding:5px 8px;color:#a0cbd9}
+@media(max-width:1100px){.discovery-grid{grid-template-columns:1fr}}
+@media(max-width:620px){.discovery-panel{padding:14px}.discovery-card{padding:14px}.discovery-row{grid-template-columns:1fr}.portal-options{grid-template-columns:1fr 1fr}}

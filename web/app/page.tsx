@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plane, Search, SlidersHorizontal, Compass, Bookmark, Sparkles, ArrowUpRight, ExternalLink, MapPin, Clock3, Building2, RefreshCw, ShieldCheck, KeyRound, LogOut, Mail, X, Check, AlertCircle, ChevronRight, Database, Github, WandSparkles, LockKeyhole } from "lucide-react";
 import type { Job } from "@/lib/jobs";
+import { PORTALS } from "@/lib/portal-search";
 import { getSupabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -49,6 +50,14 @@ export default function Page(){
  const [draft,setDraft]=useState("");
  const [draftLoading,setDraftLoading]=useState(false);
  const [message,setMessage]=useState("");
+ const [serperKey,setSerperKey]=useState("");
+ const [portalIds,setPortalIds]=useState<string[]>(["linkedin","indeed","naukri","workday","wellfound"]);
+ const [searchRole,setSearchRole]=useState("DevOps OR SRE OR Platform Engineer");
+ const [searchLocation,setSearchLocation]=useState("India");
+ const [careerUrlsText,setCareerUrlsText]=useState("");
+ const [discovering,setDiscovering]=useState(false);
+ const [careersLoading,setCareersLoading]=useState(false);
+ const [discoveryNotice,setDiscoveryNotice]=useState("");
  const supabaseReady=!!getSupabase();
  useEffect(()=>{
    // Supabase includes authentication failures in the URL fragment after redirect.
@@ -89,6 +98,45 @@ export default function Page(){
    finally{setLoading(false);}
  }
  useEffect(()=>{void scan();},[]);
+ function appendJobs(incoming:Job[]){
+  setJobs(old=>{
+   const byUrl=new Map<string,Job>();
+   for(const job of [...old,...incoming]){
+    const previous=byUrl.get(job.url);
+    if(!previous || (!previous.postedAt && job.postedAt))byUrl.set(job.url,job);
+   }
+   return [...byUrl.values()].sort((a,b)=>(b.postedAt||"").localeCompare(a.postedAt||"")||b.score-a.score);
+  });
+  if(incoming[0])setActive(previous=>previous||incoming[0].id);
+ }
+ const careerUrls=()=>careerUrlsText.split(/[\r\n]+/).map(x=>x.trim()).filter(Boolean).slice(0,6);
+ async function searchPortals(){
+  setMessage("");setDiscoveryNotice("");setDiscovering(true);
+  try{
+   const response=await fetch("/api/discover",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({apiKey:serperKey,portalIds,role:searchRole,location:searchLocation,careerSites:careerUrls()})});
+   const data=await response.json();
+   if(!response.ok)throw Error(data.error||"Portal search failed");
+   appendJobs(data.jobs||[]);
+   setDiscoveryNotice("Found "+(data.jobs||[]).length+" indexed results using "+data.queries+" Serper queries. Dates and eligibility are not verified.");
+   if(data.warnings?.length)setWarnings(prev=>[...new Set([...prev,...data.warnings])].slice(0,25));
+  }catch(e){setMessage(e instanceof Error?e.message:"Unable to search indexed portals");}
+  finally{setDiscovering(false);}
+ }
+ async function searchCompanies(){
+  setMessage("");setDiscoveryNotice("");setCareersLoading(true);
+  try{
+   const urls=careerUrls();
+   if(!urls.length)throw Error("Enter one or more supported company career URLs");
+   const response=await fetch("/api/company",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({urls})});
+   const data=await response.json();
+   if(!response.ok)throw Error(data.error||"Unable to check company career pages");
+   appendJobs(data.jobs||[]);
+   setDiscoveryNotice("Found "+(data.jobs||[]).length+" role matches on supported company career feeds.");
+   if(data.warnings?.length)setWarnings(prev=>[...new Set([...prev,...data.warnings])].slice(0,25));
+  }catch(e){setMessage(e instanceof Error?e.message:"Unable to scan company pages");}
+  finally{setCareersLoading(false);}
+ }
  // A client-side cooldown reduces accidental duplicate email requests.
  // It cannot override or reset Supabase's project-wide SMTP quota.
  useEffect(()=>{
@@ -199,11 +247,11 @@ export default function Page(){
    <div className="sidebar-sources">
     <div><span className="source-dot green"/> Ashby & company ATS</div>
     <div><span className="source-dot purple"/> Remote job feeds</div>
-    <div><span className="source-dot blue"/> Direct application links</div>
+    <div><span className="source-dot blue"/> Indexed portal discovery</div>
    </div>
    <div className="side-bottom">
     <div className="tip"><div className="tip-heading"><ShieldCheck size={17}/> Privacy first</div>
-     <p>Applications are always yours to review and submit. Your AI key isn't saved.</p></div>
+     <p>Applications are always yours to review and submit. Your AI and Serper keys aren't saved.</p></div>
     <a className="github-link" href="https://github.com/Chirag0401/jobpilot-ai" target="_blank" rel="noreferrer"><Github size={17}/> Open-source on GitHub <ArrowUpRight size={14}/></a>
    </div>
   </aside>
@@ -233,7 +281,32 @@ export default function Page(){
       <label className="filterselect"><SlidersHorizontal size={16}/><select value={source} onChange={e=>setSource(e.target.value)}><option value="all">All sources</option>{sources.map(s=><option key={s} value={s}>{s}</option>)}</select></label>
       <label className="filterselect"><Clock3 size={16}/><select value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest first</option><option value="score">Best match</option></select></label>
      </div>
-     {warnings.length>0&&<div className="notice"><AlertCircle size={16}/> {warnings.length} source(s) unavailable during this scan. Other sources may still have results.</div>}
+     <section className="discovery-panel" aria-label="Additional job sources">
+       <div className="discovery-header"><div><h3>Expand your search</h3><p>Connect more job portals and company career sites. AI model keys are configured separately in the AI Studio.</p></div><Search size={20}/></div>
+       <div className="discovery-grid">
+        <div className="discovery-card">
+         <div className="discovery-card-title"><strong>Portal search powered by Serper</strong><a href="https://serper.dev/" target="_blank" rel="noreferrer">Get Serper key <ArrowUpRight size={12}/></a></div>
+         <label className="field"><span>Serper API key <small>Not stored</small></span><input type="password" autoComplete="off" value={serperKey} onChange={e=>setSerperKey(e.target.value)} placeholder="Paste key for Google-indexed job search"/></label>
+         <div className="discovery-row">
+          <label className="field"><span>Role keywords</span><input value={searchRole} onChange={e=>setSearchRole(e.target.value)} maxLength={90}/></label>
+          <label className="field"><span>Search region</span><input value={searchLocation} onChange={e=>setSearchLocation(e.target.value)} maxLength={60}/></label>
+         </div>
+         <div className="discovery-card-title"><strong>Select portals ({portalIds.length}/{PORTALS.length})</strong><button className="text-action" onClick={()=>setPortalIds(portalIds.length===PORTALS.length?[]:PORTALS.map(p=>p.id))}>{portalIds.length===PORTALS.length?"Clear all":"Select all"}</button></div>
+         <div className="portal-options">{PORTALS.map(p=><label className="portal-option" key={p.id}><input type="checkbox" checked={portalIds.includes(p.id)} onChange={e=>setPortalIds(prev=>e.target.checked?[...prev,p.id]:prev.filter(x=>x!==p.id))}/>{p.name}</label>)}</div>
+         <button className="primary-button full" onClick={()=>void searchPortals()} disabled={discovering||serperKey.trim().length<8||(!portalIds.length&&!careerUrlsText.trim())}><Search size={15}/>{discovering?"Searching indexed sources...":"Search selected portals"}</button>
+         <p className="discovery-note">Uses one Serper query per portal or company domain you select, only when you click Search. Provider charges or credits may apply. Jobs are indexed results, not scraped portal listings.</p>
+        </div>
+        <div className="discovery-card">
+         <div className="discovery-card-title"><strong>Company career pages</strong><span className="mini-tag">Direct public feeds</span></div>
+         <label className="field"><span>Career URLs <small>One per line · up to 6</small></span>
+          <textarea rows={5} value={careerUrlsText} onChange={e=>setCareerUrlsText(e.target.value)} placeholder={"https://jobs.ashbyhq.com/company\nhttps://apply.workable.com/company\nhttps://company.wd5.myworkdayjobs.com/en-US/External"}/></label>
+         <button className="outline-button full" disabled={careersLoading||!careerUrlsText.trim()} onClick={()=>void searchCompanies()}><Building2 size={15}/>{careersLoading?"Checking careers sites...":"Scan supported boards (free)"}</button>
+         <p className="discovery-note">Supports Workday, Ashby, Greenhouse, Lever, Workable and SmartRecruiters. Workday's public website feed is unofficial and can change. For any other career URL, use Serper search with the same URL above.</p>
+        </div>
+       </div>
+       {discoveryNotice&&<div className="discovery-notice" role="status">{discoveryNotice}</div>}
+      </section>
+      {warnings.length>0&&<div className="notice"><AlertCircle size={16}/> {warnings.length} source(s) unavailable during this scan. Other sources may still have results.</div>}
      {message&&<div className="notice error"><AlertCircle size={16}/>{message}<button onClick={()=>setMessage("")} aria-label="Dismiss"><X size={16}/></button></div>}
      <div className="listing-layout">
       <div className="listing">
@@ -264,7 +337,7 @@ export default function Page(){
        </>:<div className="empty">Choose a role to see details</div>}
       </aside>
      </div>
-     <p className="footer-note">Jobs come from public feeds. Posting dates vary by source. Verify eligibility, availability and details directly with the employer.</p>
+     <p className="footer-note">Jobs include direct public feeds and optionally Google-indexed results. Indexed results have unverified publication dates and locations. Confirm job eligibility, availability and details with the original employer.</p>
     </>:tab==="saved"?<>
      <div className="section-row page-heading"><div><div className="eyebrow">YOUR SHORTLIST</div><h1>Saved opportunities</h1><p>A private space to keep track of roles worth pursuing.</p></div></div>
      {!user?<div className="feature-empty"><Bookmark size={34}/><h2>Keep your best opportunities together</h2><p>Sign in with email to privately save jobs and return to them later.</p><button className="primary-button" onClick={()=>setAuthOpen(true)}>Sign in to save jobs <ArrowUpRight size={16}/></button></div>:

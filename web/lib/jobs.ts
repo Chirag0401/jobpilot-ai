@@ -36,20 +36,20 @@ async function json<T>(url: string): Promise<T> {
  if (!response.ok) throw new Error("Upstream HTTP " + response.status);
  return response.json() as Promise<T>;
 }
-async function ashby(board: string): Promise<Job[]> {
+export async function ashby(board: string): Promise<Job[]> {
  const data = await json<{jobs?:Record<string,unknown>[] }>("https://api.ashbyhq.com/posting-api/job-board/" + encodeURIComponent(board));
  return (data.jobs || []).filter(x => x.isListed !== false).map(x => job(String(x.title || ""),board,
   String(x.location || ""), "Ashby", String(x.jobUrl || ""), x.publishedAt, "last published",
   String(x.descriptionPlain || x.descriptionHtml || ""))).filter((x):x is Job=>!!x);
 }
-async function greenhouse(board: string): Promise<Job[]> {
+export async function greenhouse(board: string): Promise<Job[]> {
  const data = await json<{jobs?: Record<string,unknown>[]}>("https://boards-api.greenhouse.io/v1/boards/" + encodeURIComponent(board) + "/jobs?content=true");
  return (data.jobs || []).map(x => job(String(x.title || ""),board,
   String((x.location as {name?:string}|undefined)?.name || ""), "Greenhouse",
   String(x.absolute_url || ""), x.first_published || x.updated_at,
   x.first_published ? "first published" : "updated", String(x.content || ""))).filter((x):x is Job=>!!x);
 }
-async function lever(board: string): Promise<Job[]> {
+export async function lever(board: string): Promise<Job[]> {
  const data = await json<Record<string,unknown>[]>("https://api.lever.co/v0/postings/" + encodeURIComponent(board) + "?mode=json");
  return (Array.isArray(data) ? data : []).map(x => job(String(x.text || ""),board,
  String((x.categories as {location?:string}|undefined)?.location || ""), "Lever",
