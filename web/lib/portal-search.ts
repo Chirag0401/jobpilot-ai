@@ -60,7 +60,7 @@ export async function searchIndexedJobs(key:string,ids:string[],role:string,loca
  targets.push(...validateCareerDomains(careerSites).map(domain=>({name:"Company careers",domain})));
  const bounded=targets.slice(0,16);
  const results:Job[]=[];const warnings:string[]=[];
- const cleanRole=role.replace(/[^\p{L}\p{N} +.#/-]/gu," ").trim().slice(0,90)||"DevOps SRE Platform Engineer";
+ const cleanRole=role.replace(/[^\p{L}\p{N} +.#-]/gu," ").trim().slice(0,90)||"DevOps SRE Platform Engineer";
  const cleanLocation=location.replace(/[^\p{L}\p{N} ,.-]/gu," ").trim().slice(0,60)||"India";
  // 1 query per selected source; users must click to incur Serper API usage.
  for(let offset=0;offset<bounded.length;offset+=4) {
