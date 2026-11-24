@@ -141,7 +141,10 @@ function likelyLocationMatch(job:Job,location:string):boolean{
  if(!region||region==="anywhere"||region==="worldwide")return true;
  const loc=job.location.toLowerCase();
  if(loc.includes(region))return true;
- if(/remote|not verified|worldwide|global/i.test(loc))return true; // only a candidate, never confirmed eligibility.
+ // Explicit country restrictions take precedence over a generic "remote" label.
+ if(region==="india" && /united states|\busa\b|canada|united kingdom|\buk\b|europe only|australia only/i.test(loc)
+    && !/\bindia\b/i.test(loc))return false;
+ if(/remote|not verified|worldwide|global/i.test(loc))return true; // eligibility still unverified.
  if(region==="india"){
   return /india|mumbai|pune|bengaluru|bangalore|hyderabad|chennai|noida|gurgaon|gurugram|delhi|kolkata|ahmedabad|thane/i.test(loc);
  }
