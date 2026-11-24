@@ -59,7 +59,7 @@ export default function Page(){
  const [searchRole,setSearchRole]=useState("");
  const [searchLocation,setSearchLocation]=useState("India");
  const [searchDepth,setSearchDepth]=useState<1|2>(1);
- const [freshness,setFreshness]=useState<"any"|"week"|"month">("month");
+ const [freshness,setFreshness]=useState<"any"|"week"|"month">("any");
  const [careerUrlsText,setCareerUrlsText]=useState("");
  const [discovering,setDiscovering]=useState(false);
  const [careersLoading,setCareersLoading]=useState(false);
@@ -120,10 +120,11 @@ export default function Page(){
    setSearchStats(data.stats||null);
    setScannedAt(new Date().toISOString());
    const metrics=data.stats||{};
-   setDiscoveryNotice("Search complete: "+results.length+" relevant results from "+(metrics.inspected||0)+
-    " indexed hits across "+(metrics.queries||0)+" queries. Unverified dates and locations are clearly labeled.");
+   setDiscoveryNotice("Search finished: "+results.length+" relevant results from "+(metrics.inspected||0)+
+    " indexed listings. "+(metrics.successfulQueries||0)+" successful Serper requests; "+
+    (metrics.failedQueries||0)+" failed. Posting dates and locations remain unverified.");
    setWarnings(data.warnings||[]);
-  }catch(e){setMessage(e instanceof Error?e.message:"Unable to search selected portals");}
+  }catch(e){setHasSearched(false);setMessage(e instanceof Error?e.message:"Unable to search selected portals");}
   finally{setDiscovering(false);setLoading(false);}
  }
  async function searchCompanies(){
@@ -290,13 +291,13 @@ export default function Page(){
          <div className="discovery-card-title"><strong>Portal search powered by Serper</strong><a href="https://serper.dev/" target="_blank" rel="noreferrer">Get Serper key <ArrowUpRight size={12}/></a></div>
          <label className="field"><span>Serper API key <small>Not stored</small></span><input type="password" autoComplete="off" value={serperKey} onChange={e=>setSerperKey(e.target.value)} placeholder="Paste key for Google-indexed job search"/></label>
          <div className="discovery-row">
-          <label className="field"><span>Search-index recency</span><select value={freshness} onChange={e=>setFreshness(e.target.value as "any"|"week"|"month")}><option value="month">Past month (Google)</option><option value="week">Past week (Google)</option><option value="any">Any time</option></select></label>
-          <label className="field"><span>Search depth</span><select value={searchDepth} onChange={e=>setSearchDepth(Number(e.target.value)===2?2:1)}><option value={1}>Standard (up to 20 per portal)</option><option value={2}>Deeper (up to 40 per portal)</option></select></label>
+          <label className="field"><span>Search-index recency</span><select value={freshness} onChange={e=>setFreshness(e.target.value as "any"|"week"|"month")}><option value="any">Any time (most compatible)</option><option value="month">Past month (Google)</option><option value="week">Past week (Google)</option></select></label>
+          <label className="field"><span>Search depth</span><select value={searchDepth} onChange={e=>setSearchDepth(Number(e.target.value)===2?2:1)}><option value={1}>Standard (up to 10 per portal)</option><option value={2}>Deeper (up to 20 per portal)</option></select></label>
          </div>
          <div className="discovery-card-title"><strong>Select portals ({portalIds.length}/{PORTALS.length})</strong><button className="text-action" onClick={()=>setPortalIds(portalIds.length===PORTALS.length?[]:PORTALS.map(p=>p.id))}>{portalIds.length===PORTALS.length?"Clear all":"Select all"}</button></div>
          <div className="portal-options">{PORTALS.map(p=><label className="portal-option" key={p.id}><input type="checkbox" checked={portalIds.includes(p.id)} onChange={e=>setPortalIds(prev=>e.target.checked?[...prev,p.id]:prev.filter(x=>x!==p.id))}/>{p.name}</label>)}</div>
          <button className="primary-button full" onClick={()=>void searchPortals()} disabled={loading||!searchRole.trim()||serperKey.trim().length<8||(!portalIds.length&&!careerUrlsText.trim())}><Search size={15}/>{discovering?"Searching indexed sources...":"Search selected portals"}</button>
-         <p className="discovery-note">Estimate: {(portalIds.length+Math.min(careerUrls().length,5))*searchDepth} Serper queries/credits. Google might return fewer results than requested. Index recency does not establish job posting dates.</p>
+         <p className="discovery-note">Up to {(portalIds.length+Math.min(careerUrls().length,5))*searchDepth} search requests; deeper pages are requested only when results continue. Serper credits may apply. If a time filter causes an API error, JobPilot retries without it and tells you.</p>
         </div>
         <div className="discovery-card">
          <div className="discovery-card-title"><strong>Company career pages</strong><span className="mini-tag">Direct public feeds</span></div>
