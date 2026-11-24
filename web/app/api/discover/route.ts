@@ -1,5 +1,5 @@
 import {NextRequest,NextResponse} from "next/server";
-import {PORTALS,rolePhrases,searchIndexedJobs,type Freshness,type SearchDepth} from "@/lib/portal-search";
+import {PORTALS,rolePhrases,searchIndexedJobs,SerperSearchError,type Freshness,type SearchDepth} from "@/lib/portal-search";
 
 export const runtime="nodejs";
 export const maxDuration=60;
@@ -30,7 +30,9 @@ export async function POST(request:NextRequest){
   const result=await searchIndexedJobs(key,ids,role,location,websites,{depth,freshness});
   return NextResponse.json({...result,notice:"Search-indexed results: verify dates, eligibility and availability on the original job posting."},
    {headers:{"Cache-Control":"no-store"}});
- }catch{
-  return error("Search could not complete. Verify connectivity and your Serper balance.");
+ }catch(caught){
+  if(caught instanceof SerperSearchError)
+   return error(caught.message,caught.status===429?429:502);
+  return error("Search could not complete. Check Serper connectivity and your account credits.",502);
  }
 }
