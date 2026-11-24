@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plane, Search, SlidersHorizontal, Compass, Bookmark, Sparkles, ArrowUpRight, ExternalLink, MapPin, Clock3, Building2, RefreshCw, ShieldCheck, KeyRound, LogOut, Mail, X, Check, AlertCircle, ChevronRight, Database, Github, WandSparkles, LockKeyhole } from "lucide-react";
 import type { Job } from "@/lib/jobs";
+import { PORTALS } from "@/lib/portal-search";
 import { getSupabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -49,6 +50,14 @@ export default function Page(){
  const [draft,setDraft]=useState("");
  const [draftLoading,setDraftLoading]=useState(false);
  const [message,setMessage]=useState("");
+ const [serperKey,setSerperKey]=useState("");
+ const [portalIds,setPortalIds]=useState<string[]>(["linkedin","indeed","naukri","workday","wellfound"]);
+ const [searchRole,setSearchRole]=useState("DevOps OR SRE OR Platform Engineer");
+ const [searchLocation,setSearchLocation]=useState("India");
+ const [careerUrlsText,setCareerUrlsText]=useState("");
+ const [discovering,setDiscovering]=useState(false);
+ const [careersLoading,setCareersLoading]=useState(false);
+ const [discoveryNotice,setDiscoveryNotice]=useState("");
  const supabaseReady=!!getSupabase();
  useEffect(()=>{
    // Supabase includes authentication failures in the URL fragment after redirect.
@@ -89,6 +98,45 @@ export default function Page(){
    finally{setLoading(false);}
  }
  useEffect(()=>{void scan();},[]);
+ function appendJobs(incoming:Job[]){
+  setJobs(old=>{
+   const byUrl=new Map<string,Job>();
+   for(const job of [...old,...incoming]){
+    const previous=byUrl.get(job.url);
+    if(!previous || (!previous.postedAt && job.postedAt))byUrl.set(job.url,job);
+   }
+   return [...byUrl.values()].sort((a,b)=>(b.postedAt||"").localeCompare(a.postedAt||"")||b.score-a.score);
+  });
+  if(incoming[0])setActive(previous=>previous||incoming[0].id);
+ }
+ const careerUrls=()=>careerUrlsText.split(/[\r\n]+/).map(x=>x.trim()).filter(Boolean).slice(0,6);
+ async function searchPortals(){
+  setMessage("");setDiscoveryNotice("");setDiscovering(true);
+  try{
+   const response=await fetch("/api/discover",{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({apiKey:serperKey,portalIds,role:searchRole,location:searchLocation,careerSites:careerUrls()})});
+   const data=await response.json();
+   if(!response.ok)throw Error(data.error||"Portal search failed");
+   appendJobs(data.jobs||[]);
+   setDiscoveryNotice("Found "+(data.jobs||[]).length+" indexed results using "+data.queries+" Serper queries. Dates and eligibility are not verified.");
+   if(data.warnings?.length)setWarnings(prev=>[...new Set([...prev,...data.warnings])].slice(0,25));
+  }catch(e){setMessage(e instanceof Error?e.message:"Unable to search indexed portals");}
+  finally{setDiscovering(false);}
+ }
+ async function searchCompanies(){
+  setMessage("");setDiscoveryNotice("");setCareersLoading(true);
+  try{
+   const urls=careerUrls();
+   if(!urls.length)throw Error("Enter one or more supported company career URLs");
+   const response=await fetch("/api/company",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({urls})});
+   const data=await response.json();
+   if(!response.ok)throw Error(data.error||"Unable to check company career pages");
+   appendJobs(data.jobs||[]);
+   setDiscoveryNotice("Found "+(data.jobs||[]).length+" role matches on supported company career feeds.");
+   if(data.warnings?.length)setWarnings(prev=>[...new Set([...prev,...data.warnings])].slice(0,25));
+  }catch(e){setMessage(e instanceof Error?e.message:"Unable to scan company pages");}
+  finally{setCareersLoading(false);}
+ }
  // A client-side cooldown reduces accidental duplicate email requests.
  // It cannot override or reset Supabase's project-wide SMTP quota.
  useEffect(()=>{
