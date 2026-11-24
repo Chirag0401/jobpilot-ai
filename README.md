@@ -15,7 +15,7 @@
 
 **[🚀 Open JobPilot AI Web](https://jobpilot-ai-web.vercel.app/)**
 
-The new **Next.js web beta** lets anyone browse public DevOps/SRE/Platform job listings, filter by source and location, sort newest first, and use the optional **OpenAI / Claude / Gemini model picker** with their own API key. AI keys are used only for the selected request and are not saved in the app's database.
+The **Next.js web beta** lets anyone search for their own job title (no default listings), filter results by source and location, and use the optional **OpenAI / Claude / Gemini model picker** with their own API key. AI keys are used only for the selected request and are not saved in the app's database.
 
 **Currently available:** public job discovery, role details, direct links to employer applications, and reviewable AI answer drafts. **Not enabled yet:** personal accounts and saved jobs (require Supabase configuration), automated job submissions, and alerts. Always verify location eligibility and posting status with the employer. The original Python/Streamlit edition below is still available and has more source connector options.
 
