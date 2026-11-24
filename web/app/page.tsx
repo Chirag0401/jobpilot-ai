@@ -279,7 +279,38 @@ export default function Page(){
       <p>Search for your role, choose the websites you trust, and see only results from that search. No preset jobs or career assumptions.</p>
       <div className="hero-glow"/>
      </div>
-     <div className="metrics">
+     <section className="discovery-panel" aria-label="Additional job sources">
+       <div className="discovery-header"><div><h3>Search for your next role</h3><p>Choose a role, location and sources. No jobs load until you search.</p></div><Search size={20}/></div>
+       <div className="discovery-query">
+        <label className="field"><span>Job title / role <small>Required</small></span><input autoFocus value={searchRole} onChange={e=>setSearchRole(e.target.value)} maxLength={90} placeholder="e.g. Data Analyst, UI Designer, Software Engineer, DevOps OR SRE"/></label>
+        <label className="field"><span>Location <small>Editable</small></span><input value={searchLocation} onChange={e=>setSearchLocation(e.target.value)} maxLength={60} placeholder="India, Mumbai, Remote, United States"/></label>
+       </div>
+       <div className="discovery-grid">
+        <div className="discovery-card">
+         <div className="discovery-card-title"><strong>Portal search powered by Serper</strong><a href="https://serper.dev/" target="_blank" rel="noreferrer">Get Serper key <ArrowUpRight size={12}/></a></div>
+         <label className="field"><span>Serper API key <small>Not stored</small></span><input type="password" autoComplete="off" value={serperKey} onChange={e=>setSerperKey(e.target.value)} placeholder="Paste key for Google-indexed job search"/></label>
+         <div className="discovery-row">
+          <label className="field"><span>Search-index recency</span><select value={freshness} onChange={e=>setFreshness(e.target.value as "any"|"week"|"month")}><option value="month">Past month (Google)</option><option value="week">Past week (Google)</option><option value="any">Any time</option></select></label>
+          <label className="field"><span>Search depth</span><select value={searchDepth} onChange={e=>setSearchDepth(Number(e.target.value)===2?2:1)}><option value={1}>Standard (up to 20 per portal)</option><option value={2}>Deeper (up to 40 per portal)</option></select></label>
+         </div>
+         <div className="discovery-card-title"><strong>Select portals ({portalIds.length}/{PORTALS.length})</strong><button className="text-action" onClick={()=>setPortalIds(portalIds.length===PORTALS.length?[]:PORTALS.map(p=>p.id))}>{portalIds.length===PORTALS.length?"Clear all":"Select all"}</button></div>
+         <div className="portal-options">{PORTALS.map(p=><label className="portal-option" key={p.id}><input type="checkbox" checked={portalIds.includes(p.id)} onChange={e=>setPortalIds(prev=>e.target.checked?[...prev,p.id]:prev.filter(x=>x!==p.id))}/>{p.name}</label>)}</div>
+         <button className="primary-button full" onClick={()=>void searchPortals()} disabled={loading||!searchRole.trim()||serperKey.trim().length<8||(!portalIds.length&&!careerUrlsText.trim())}><Search size={15}/>{discovering?"Searching indexed sources...":"Search selected portals"}</button>
+         <p className="discovery-note">Estimate: {(portalIds.length+Math.min(careerUrls().length,5))*searchDepth} Serper queries/credits. Google might return fewer results than requested. Index recency does not establish job posting dates.</p>
+        </div>
+        <div className="discovery-card">
+         <div className="discovery-card-title"><strong>Company career pages</strong><span className="mini-tag">Direct public feeds</span></div>
+         <label className="field"><span>Career URLs <small>One per line · up to 6</small></span>
+          <textarea rows={5} value={careerUrlsText} onChange={e=>setCareerUrlsText(e.target.value)} placeholder={"https://jobs.ashbyhq.com/company\nhttps://apply.workable.com/company\nhttps://company.wd5.myworkdayjobs.com/en-US/External"}/></label>
+         <button className="outline-button full" disabled={loading||!searchRole.trim()||!careerUrlsText.trim()} onClick={()=>void searchCompanies()}><Building2 size={15}/>{careersLoading?"Checking careers sites...":"Scan supported boards (free)"}</button>
+         <p className="discovery-note">Search YOUR role on supported public career feeds: Workday, Ashby, Greenhouse, Lever, Workable and SmartRecruiters. Workday's unofficial feed may change; use Serper for other domains.</p>
+        </div>
+       </div>
+       {discoveryNotice&&<div className="discovery-notice" role="status">{discoveryNotice}</div>}
+      </section>
+      {message&&<div className="notice error" role="alert"><AlertCircle size={16}/>{message}<button onClick={()=>setMessage("")} aria-label="Dismiss"><X size={16}/></button></div>}
+      {hasSearched ? <>
+      <div className="metrics">
       <div><span>OPEN ROLES FOUND</span><strong>{loading?"—":jobs.length}</strong><small>Across available sources</small></div>
       <div><span>COMPANIES</span><strong>{loading?"—":new Set(jobs.map(j=>j.company)).size}</strong><small>Hiring teams discovered</small></div>
       <div><span>SAVED OPPORTUNITIES</span><strong>{saved.length}</strong><small>{user?"Private to your account":"Sign in to save jobs"}</small></div>
@@ -292,31 +323,7 @@ export default function Page(){
       <label className="filterselect"><SlidersHorizontal size={16}/><select value={source} onChange={e=>setSource(e.target.value)}><option value="all">All sources</option>{sources.map(s=><option key={s} value={s}>{s}</option>)}</select></label>
       <label className="filterselect"><Clock3 size={16}/><select value={sort} onChange={e=>setSort(e.target.value)}><option value="newest">Newest first</option><option value="score">Best match</option></select></label>
      </div>
-     <section className="discovery-panel" aria-label="Additional job sources">
-       <div className="discovery-header"><div><h3>Expand your search</h3><p>Connect more job portals and company career sites. AI model keys are configured separately in the AI Studio.</p></div><Search size={20}/></div>
-       <div className="discovery-grid">
-        <div className="discovery-card">
-         <div className="discovery-card-title"><strong>Portal search powered by Serper</strong><a href="https://serper.dev/" target="_blank" rel="noreferrer">Get Serper key <ArrowUpRight size={12}/></a></div>
-         <label className="field"><span>Serper API key <small>Not stored</small></span><input type="password" autoComplete="off" value={serperKey} onChange={e=>setSerperKey(e.target.value)} placeholder="Paste key for Google-indexed job search"/></label>
-         <div className="discovery-row">
-          <label className="field"><span>Role keywords</span><input value={searchRole} onChange={e=>setSearchRole(e.target.value)} maxLength={90}/></label>
-          <label className="field"><span>Search region</span><input value={searchLocation} onChange={e=>setSearchLocation(e.target.value)} maxLength={60}/></label>
-         </div>
-         <div className="discovery-card-title"><strong>Select portals ({portalIds.length}/{PORTALS.length})</strong><button className="text-action" onClick={()=>setPortalIds(portalIds.length===PORTALS.length?[]:PORTALS.map(p=>p.id))}>{portalIds.length===PORTALS.length?"Clear all":"Select all"}</button></div>
-         <div className="portal-options">{PORTALS.map(p=><label className="portal-option" key={p.id}><input type="checkbox" checked={portalIds.includes(p.id)} onChange={e=>setPortalIds(prev=>e.target.checked?[...prev,p.id]:prev.filter(x=>x!==p.id))}/>{p.name}</label>)}</div>
-         <button className="primary-button full" onClick={()=>void searchPortals()} disabled={discovering||serperKey.trim().length<8||(!portalIds.length&&!careerUrlsText.trim())}><Search size={15}/>{discovering?"Searching indexed sources...":"Search selected portals"}</button>
-         <p className="discovery-note">Uses one Serper query per portal or company domain you select, only when you click Search. Provider charges or credits may apply. Jobs are indexed results, not scraped portal listings.</p>
-        </div>
-        <div className="discovery-card">
-         <div className="discovery-card-title"><strong>Company career pages</strong><span className="mini-tag">Direct public feeds</span></div>
-         <label className="field"><span>Career URLs <small>One per line · up to 6</small></span>
-          <textarea rows={5} value={careerUrlsText} onChange={e=>setCareerUrlsText(e.target.value)} placeholder={"https://jobs.ashbyhq.com/company\nhttps://apply.workable.com/company\nhttps://company.wd5.myworkdayjobs.com/en-US/External"}/></label>
-         <button className="outline-button full" disabled={careersLoading||!careerUrlsText.trim()} onClick={()=>void searchCompanies()}><Building2 size={15}/>{careersLoading?"Checking careers sites...":"Scan supported boards (free)"}</button>
-         <p className="discovery-note">Supports Workday, Ashby, Greenhouse, Lever, Workable and SmartRecruiters. Workday's public website feed is unofficial and can change. For any other career URL, use Serper search with the same URL above.</p>
-        </div>
-       </div>
-       {discoveryNotice&&<div className="discovery-notice" role="status">{discoveryNotice}</div>}
-      </section>
+     
       {warnings.length>0&&<div className="notice"><AlertCircle size={16}/> {warnings.length} source(s) unavailable during this scan. Other sources may still have results.</div>}
      {message&&<div className="notice error"><AlertCircle size={16}/>{message}<button onClick={()=>setMessage("")} aria-label="Dismiss"><X size={16}/></button></div>}
      <div className="listing-layout">
@@ -348,7 +355,9 @@ export default function Page(){
        </>:<div className="empty">Choose a role to see details</div>}
       </aside>
      </div>
-     <p className="footer-note">Jobs include direct public feeds and optionally Google-indexed results. Indexed results have unverified publication dates and locations. Confirm job eligibility, availability and details with the original employer.</p>
+     {searchStats&&<p className="footer-note">Search details: {searchStats.inspected} indexed/feed listings inspected, {searchStats.matched} role matches, {jobs.length} unique results{searchStats.queries?", "+searchStats.queries+" Serper queries":""}. This is not a count of all open jobs.</p>}
+      <p className="footer-note">Jobs include direct public feeds and optionally Google-indexed results. Indexed results have unverified publication dates and locations. Confirm job eligibility, availability and details with the original employer.</p>
+      </> : <div className="search-empty"><Search size={30}/><h3>Ready when you are</h3><p>Enter a job role and choose sources above, then click Search. Nothing is loaded by default.</p></div>
     </>:tab==="saved"?<>
      <div className="section-row page-heading"><div><div className="eyebrow">YOUR SHORTLIST</div><h1>Saved opportunities</h1><p>A private space to keep track of roles worth pursuing.</p></div></div>
      {!user?<div className="feature-empty"><Bookmark size={34}/><h2>Keep your best opportunities together</h2><p>Sign in with email to privately save jobs and return to them later.</p><button className="primary-button" onClick={()=>setAuthOpen(true)}>Sign in to save jobs <ArrowUpRight size={16}/></button></div>:
