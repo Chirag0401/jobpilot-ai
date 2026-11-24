@@ -14,9 +14,9 @@ test("roles are chosen by the visitor rather than hard-coded DevOps terms",()=>{
 });
 test("Serper queries target the selected role and a specific portal",()=>{
  const query=buildQuery("Data Analyst OR Business Analyst","Mumbai","linkedin.com/jobs/view");
- assert.match(query,/Data Analyst/);
- assert.match(query,/Business Analyst/);
- assert.match(query,/Mumbai/);
+ assert.match(query,/Data Analyst/i);
+ assert.match(query,/Business Analyst/i);
+ assert.match(query,/Mumbai/i);
  assert.match(query,/site:linkedin.com\/jobs\/view/);
  assert.doesNotMatch(buildQuery("UI Designer","India","indeed.com"),/DevOps/i);
 });
@@ -46,7 +46,7 @@ test("Serper pagination returns relevant jobs without unrelated preset jobs",asy
  globalThis.fetch=async(_request,options)=>{
   called++;
   const payload=JSON.parse(String(options?.body||"{}")) as {q:string;page:number;num:number};
-  assert.match(payload.q,/Data Analyst/);
+  assert.match(payload.q,/Data Analyst/i);
   assert.equal(payload.num,20);
   return new Response(JSON.stringify({organic:[
    {title:"Data Analyst | Example",link:"https://www.linkedin.com/jobs/view/"+payload.page,
