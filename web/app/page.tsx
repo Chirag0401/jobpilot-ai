@@ -356,7 +356,7 @@ export default function Page(){
      </div>
      {searchStats&&<p className="footer-note">Search details: {searchStats.inspected} indexed/feed listings inspected, {searchStats.matched} role matches, {jobs.length} unique results{searchStats.queries?", "+searchStats.queries+" Serper queries":""}. This is not a count of all open jobs.</p>}
       <p className="footer-note">Jobs include direct public feeds and optionally Google-indexed results. Indexed results have unverified publication dates and locations. Confirm job eligibility, availability and details with the original employer.</p>
-      </> : <div className="search-empty"><Search size={30}/><h3>Ready when you are</h3><p>Enter a job role and choose sources above, then click Search. Nothing is loaded by default.</p></div>
+      </> : <div className="search-empty"><Search size={30}/><h3>Ready when you are</h3><p>Enter a job role and choose sources above, then click Search. Nothing is loaded by default.</p></div>}
     </>:tab==="saved"?<>
      <div className="section-row page-heading"><div><div className="eyebrow">YOUR SHORTLIST</div><h1>Saved opportunities</h1><p>A private space to keep track of roles worth pursuing.</p></div></div>
      {!user?<div className="feature-empty"><Bookmark size={34}/><h2>Keep your best opportunities together</h2><p>Sign in with email to privately save jobs and return to them later.</p><button className="primary-button" onClick={()=>setAuthOpen(true)}>Sign in to save jobs <ArrowUpRight size={16}/></button></div>:
