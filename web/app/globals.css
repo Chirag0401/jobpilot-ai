@@ -33,3 +33,15 @@
 .mini-tag{font-size:10px;font-weight:700;border:1px solid #385266;border-radius:5px;padding:5px 8px;color:#a0cbd9}
 @media(max-width:1100px){.discovery-grid{grid-template-columns:1fr}}
 @media(max-width:620px){.discovery-panel{padding:14px}.discovery-card{padding:14px}.discovery-row{grid-template-columns:1fr}.portal-options{grid-template-columns:1fr 1fr}}
+
+/* Search-first: show a clear primary query, then user-selected results. */
+.discovery-query{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,.75fr);gap:13px;
+ margin:0 0 19px;padding:18px;border-radius:10px;background:#0b1828;border:1px solid #2b4050}
+.discovery-query .field{margin:0}
+.discovery-query .field input{font-size:14px;font-weight:600;padding:15px}
+.search-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;
+ background:#101d2e;border:1px dashed #385368;border-radius:16px;min-height:220px;
+ margin:22px 0;padding:35px 20px;text-align:center;color:#8bb2af}
+.search-empty h3{font:800 19px Manrope,system-ui,sans-serif;color:#e7f2ef;margin:15px 0 5px}
+.search-empty p{max-width:490px;color:#8ea5b5;line-height:1.65;font-size:12px}
+@media(max-width:720px){.discovery-query{grid-template-columns:1fr}}
