@@ -66,3 +66,18 @@ test("Serper pagination returns relevant jobs without unrelated preset jobs",asy
   assert.ok(out.jobs.every(j=>!j.postedAt));
  }finally{globalThis.fetch=original;}
 });
+
+
+test("India company searches reject explicitly US-only remote locations",async()=>{
+ const {fetchCompanyJobs}=await import("../lib/company-boards");
+ const original=globalThis.fetch;
+ globalThis.fetch=async()=>new Response(JSON.stringify({name:"Example",jobs:[
+  {title:"Data Analyst",city:"Remote",country:"United States",shortlink:"https://apply.workable.com/j/US1"},
+  {title:"Data Analyst",city:"Mumbai",country:"India",shortlink:"https://apply.workable.com/j/IN1"}
+ ]}),{status:200,headers:{"Content-Type":"application/json"}});
+ try{
+  const result=await fetchCompanyJobs(["https://apply.workable.com/example"],"Data Analyst","India");
+  assert.equal(result.jobs.length,1);
+  assert.equal(result.jobs[0].location,"Mumbai, India");
+ }finally{globalThis.fetch=original;}
+});
