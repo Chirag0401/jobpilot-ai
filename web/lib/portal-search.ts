@@ -48,11 +48,11 @@ function containsWords(text:string,phrase:string):number{
 export function roleRelevance(title:string,description:string,role:string):number{
  const phrases=rolePhrases(role);
  if(!phrases.length)return 0;
- const cleanedTitle=words(title),cleanedBody=words(description);
+ const cleanedTitle=" "+words(title)+" ",cleanedBody=" "+words(description)+" ";
  let score=0;
  for(const phrase of phrases){
-  if(cleanedTitle.includes(phrase))score=Math.max(score,94);
-  else if(cleanedBody.includes(phrase))score=Math.max(score,65);
+  if(cleanedTitle.includes(" "+phrase+" "))score=Math.max(score,94);
+  else if(cleanedBody.includes(" "+phrase+" "))score=Math.max(score,65);
   else {
    const titleRatio=containsWords(title,phrase);
    const combinedRatio=containsWords(title+" "+description,phrase);
